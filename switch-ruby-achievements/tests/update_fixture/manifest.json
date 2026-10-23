@@ -1,0 +1,27 @@
+{
+ "version": "9.9.9",
+ "min_version": "0.0.0",
+ "notes": "Versão de teste.",
+ "files": [
+  {
+   "path": "switch/ruby_achievements/ruby_achievements.nro",
+   "size": 67,
+   "sha256": "f4fe8610fd2f516313fde1d94169c1b3fa3382197b4cd080ab96e1cf15f711df"
+  },
+  {
+   "path": "switch/.overlays/ruby-achievements-overlay.ovl",
+   "size": 75,
+   "sha256": "4163e264c0eb16564fdbec87ba3fb2012691350da569c427adae8249bb25245a"
+  },
+  {
+   "path": "atmosphere/contents/0100000000007A11/exefs.nsp",
+   "size": 55,
+   "sha256": "775b79a8943c072f2233abd17822c25f5c1a6a8a2255ff48c56feef212d4e67a"
+  },
+  {
+   "path": "atmosphere/contents/0100000000007A11/toolbox.json",
+   "size": 58,
+   "sha256": "4ac0739d0e886f609376803e536812f3b119d21e06b2408314c549126e533ebf"
+  }
+ ]
+}

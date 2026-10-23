@@ -1,0 +1,35 @@
+Modelo de conquista por memória (ram_flag_search). Este arquivo não é carregado:
+as conquistas vêm de <Title ID>.json (jogo do sistema) ou <nome da ROM>.json.
+
+Os valores abaixo são ilustrativos. Assinatura e offsets dependem do jogo e da
+versão: descubra os seus com EdiZon/Breeze ou um disassembler e confira no log
+(/switch/ruby_achievements/sysmodule.log) a linha "assinatura ... achada em main+0x...".
+A assinatura precisa aparecer exatamente uma vez no módulo principal.
+
+{
+  "game_name": "Meu jogo",
+  "achievements": [
+    {
+      "id": "glider_ram",
+      "title": "Planador (memória)",
+      "description": "Desbloqueia com o jogo aberto.",
+      "type": "ram_flag_search",
+      "signature": "AA BB CC DD ?? ?? EE FF 00 11 22 33",
+      "pointer_offsets": ["0x10", "0x20"],
+      "search_size": "0x10000",
+      "flag_name": "IsGet_PlayerStole2",
+      "hash_type": "crc32",
+      "offset_after_flag": 4,
+      "size": 4,
+      "expected_value_int": 1
+    },
+    {
+      "id": "sem_assinatura",
+      "title": "Ponteiro a partir do main",
+      "type": "ram_flag_search",
+      "pointer_offsets": ["0x2CA1140", "0x58"],
+      "flag_hash": "0x1A2B3C4D",
+      "expected_value_int": 1
+    }
+  ]
+}

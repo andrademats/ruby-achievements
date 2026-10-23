@@ -1,0 +1,94 @@
+diff --git a/library/include/borealis/core/view.hpp b/library/include/borealis/core/view.hpp
+index 227cd78..7927b47 100644
+--- a/library/include/borealis/core/view.hpp
++++ b/library/include/borealis/core/view.hpp
+@@ -228,6 +228,13 @@ float ntz(float value);
+ //
+ // willAppear and willDisappear can be called zero or multiple times
+ // before deletion (in case of a TabLayout for instance)
++// Switch Playtime (patch local): desenho próprio da borda de foco no lugar do
++// contorno pulsante do Borealis. nullptr = desenho original. Recebe o retângulo
++// do destaque (o traço fica centrado nele), o raio e a opacidade.
++using HighlightBorderDrawer = void (*)(NVGcontext* vg, float x, float y, float width, float height, float radius,
++                                       float alpha);
++extern HighlightBorderDrawer highlightBorderDrawer;
++
+ class View
+ {
+   private:
+diff --git a/library/include/borealis/extern/nanovg/dk_renderer.hpp b/library/include/borealis/extern/nanovg/dk_renderer.hpp
+index 93e4095..09ed74c 100644
+--- a/library/include/borealis/extern/nanovg/dk_renderer.hpp
++++ b/library/include/borealis/extern/nanovg/dk_renderer.hpp
+@@ -150,7 +150,7 @@ namespace nvg {
+                 SamplerType_Total     = 0x10,
+             };
+         private:
+-            static constexpr size_t DynamicCmdSize = 0x20000;
++            static constexpr size_t DynamicCmdSize = 0x40000;  // Switch Playtime: 128 -> 256 KB de folga
+             static constexpr size_t FragmentUniformSize = sizeof(DKNVGfragUniforms) + 4 - sizeof(DKNVGfragUniforms) % 4;
+             static constexpr size_t MaxImages = 0x1000;
+ 
+diff --git a/library/lib/core/view.cpp b/library/lib/core/view.cpp
+index 59ec77b..a7deab7 100644
+--- a/library/lib/core/view.cpp
++++ b/library/lib/core/view.cpp
+@@ -46,6 +46,8 @@ using namespace brls::literals;
+ namespace brls
+ {
+ 
++HighlightBorderDrawer highlightBorderDrawer = nullptr;  // Switch Playtime (patch local)
++
+ void AppletFrameItem::setHintView(View* hintView)
+ {
+     this->hintView = hintView;
+@@ -614,6 +616,14 @@ void View::drawHighlight(NVGcontext* vg, Theme theme, float alpha, Style style,
+         nvgFillPaint(vg, shadowPaint);
+         nvgFill(vg);
+ 
++        // Switch Playtime: borda desenhada pelo app (ver highlightBorderDrawer).
++        if (highlightBorderDrawer)
++        {
++            highlightBorderDrawer(vg, x, y, width, height, cornerRadius, alpha * this->getAlpha());
++            nvgRestore(vg);
++            return;
++        }
++
+         // Border
+         float gradientX, gradientY, color;
+         getHighlightAnimation(&gradientX, &gradientY, &color);
+diff --git a/library/lib/extern/nanovg/deko3d/dk_renderer.cpp b/library/lib/extern/nanovg/deko3d/dk_renderer.cpp
+index 9b3d8dc..9b9275b 100644
+--- a/library/lib/extern/nanovg/deko3d/dk_renderer.cpp
++++ b/library/lib/extern/nanovg/deko3d/dk_renderer.cpp
+@@ -533,6 +533,17 @@ namespace nvg {
+             /* Update buffers with data. */
+             this->UpdateVertexBuffer(ctx.verts, ctx.nverts * sizeof(NVGvertex));
+ 
++            /* Switch Playtime (patch local): sem memória para os vértices, descarta o
++               quadro em vez de usar um buffer vazio (fechava o app). */
++            if (!m_vertex_buffer) {
++                m_dyn_cmd_buf.clear();
++                ctx.nverts = 0;
++                ctx.npaths = 0;
++                ctx.ncalls = 0;
++                ctx.nuniforms = 0;
++                return;
++            }
++
+             /* Enable blending. */
+             m_dyn_cmd_buf.bindColorState(dk::ColorState{}.setBlendEnable(0, true));
+ 
+diff --git a/library/lib/platforms/switch/switch_video.cpp b/library/lib/platforms/switch/switch_video.cpp
+index 7fb0663..83a8328 100644
+--- a/library/lib/platforms/switch/switch_video.cpp
++++ b/library/lib/platforms/switch/switch_video.cpp
+@@ -30,7 +30,7 @@ limitations under the License.
+ 
+ #define IMAGES_POOL_SIZE 4 * 1024 * 1024
+ #define CODE_POOL_SIZE 128 * 1024
+-#define DATA_POOL_SIZE 1 * 1024 * 1024
++#define DATA_POOL_SIZE 2 * 1024 * 1024  // Switch Playtime: 1 -> 2 MiB (comandos de 256 KB + vértices)
+ 
+ namespace brls
+ {

@@ -1,0 +1,10 @@
+[submodule "switch-ruby-achievements/overlay/lib/libtesla"]
+	path = switch-ruby-achievements/overlay/lib/libtesla
+	url = https://github.com/WerWolv/libtesla.git
+	# patches/libtesla.patch fica aplicado na cópia de trabalho (make patches)
+	ignore = dirty
+[submodule "switch-ruby-achievements/app_nro/lib/borealis"]
+	path = switch-ruby-achievements/app_nro/lib/borealis
+	url = https://github.com/xfangfang/borealis.git
+	# patches/borealis.patch fica aplicado na cópia de trabalho (make patches)
+	ignore = dirty

@@ -1,0 +1,10 @@
+Sons do pop-up de conquista do overlay do Ruby Achievements.
+
+conquista.wav é o som padrão. Para usar outro, copie o arquivo para esta pasta
+e escolha-o no app: Configurações (engrenagem do menu +) > Interface > Som da
+conquista. Regras do arquivo:
+  - formato: .wav, PCM de 16 bits, 48000 Hz, mono ou estéreo;
+  - duração: de 3 a 10 segundos (o pop-up dura exatamente o tempo do som).
+O app mostra o problema de cada arquivo fora das regras e não deixa escolhê-lo;
+se o escolhido sumir ou mudar, o overlay toca o som padrão.
+Sem conquista.wav (ou em outro formato) o pop-up padrão fica mudo e dura 5 segundos.

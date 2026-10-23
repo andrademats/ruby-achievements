@@ -1,0 +1,10 @@
+# Texto normalizado para LF no repositório (o git do Windows usa autocrlf).
+* text=auto
+# Patches das bibliotecas: byte a byte, sem conversão de fim de linha.
+*.patch -text
+# Manifesto assinado do teste da atualização: a assinatura cobre os bytes exatos.
+switch-ruby-achievements/tests/update_fixture/** -text
+# Scripts do MSYS2/bash precisam de LF mesmo no Windows.
+*.sh text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf

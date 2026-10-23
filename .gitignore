@@ -1,0 +1,109 @@
+# Ruby Achievements / AchieveSet — o que nunca entra no Git.
+# Antes de todo commit: `git status --ignored` e conferir que nada daqui aparece como "staged".
+
+# --- Chaves da Nintendo (nunca, em pasta nenhuma) ---------------------------
+*.keys
+prod.keys
+title.keys
+dev.keys
+keys.txt
+*.tik
+*.cert
+
+# --- Dumps e conteúdo de jogo ------------------------------------------------
+*.nca
+*.ncz
+*.nsp
+*.nsz
+*.xci
+*.xcz
+*.nso
+*.npdm
+*.nacp
+# Executável `main` extraído de um jogo (só na raiz e em pastas de extração)
+/main
+**/exefs/main
+nsp_extraido/
+# Saves de jogo
+*.svi
+*.sav
+/Zelda BOTW SAVE/
+# Ferramentas de terceiros com chaves e dumps dentro (SAK, hactool)
+/SAK_64bit/
+hactool*.exe
+
+# --- Artefatos de build ------------------------------------------------------
+build/
+dist/
+*.nro
+*.ovl
+*.elf
+*.map
+*.lst
+*.o
+*.a
+*.d
+*.exe
+*.dll
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Saída de tools/release_manifest.py make (assets da release; publicar no GitHub, não commitar)
+release/
+# Binários falsos (texto) do teste da atualização: entram no Git
+!switch-ruby-achievements/tests/update_fixture/assets/*
+
+# --- Dados locais do usuário (cópias do SD) ----------------------------------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+db.lock/
+config.ini
+secrets.ini
+users.txt
+status.txt
+ghost_tids.txt
+active_packs.txt
+achievement_popup.txt
+achievement_current.txt
+achievement_seen.txt
+ghost_icon.jpg
+
+# --- Logs (trazem UIDs de conta do console) ----------------------------------
+*.log
+/logs/
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- Memória local da IA (ai-memory, Claude Code): nunca no Git ---------------
+ai-memory/
+.ai-memory/
+*ai-memory*
+*ai_memory*
+.claude/
+
+# --- Só na cópia local (fora do repositório público) -------------------------
+# Docs internas de trabalho (estado e mapa técnico), mantidas só localmente.
+/ARCHITECTURE.md
+/PROJECT_STATE.md
+# Capturas de tela de referência. Os PNG dos troféus usados pelo build ficam em
+# switch-ruby-achievements/tools/assets/.
+/prints/
+# AchieveSet Studio: repositório Git próprio, só fica nesta pasta por conveniência.
+/achieveset_studio/
+
+# --- Editores, SO e ferramentas locais ---------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+.cache/

@@ -1,0 +1,24 @@
+diff --git a/include/tesla.hpp b/include/tesla.hpp
+index c0e9830..2b01dbd 100644
+--- a/include/tesla.hpp
++++ b/include/tesla.hpp
+@@ -894,6 +894,19 @@ namespace tsl {
+                 return string;
+             }
+ 
++            /**
++             * @brief Moves the layer (screen coordinates, 1920x1080).
++             * Patch local do Switch Playtime: os pop-ups de conquista ficam no canto
++             * superior direito e o menu volta para a esquerda.
++             */
++            static void setLayerPosition(u16 x, u16 y) {
++                cfg::LayerPosX = x;
++                cfg::LayerPosY = y;
++                Renderer& r = Renderer::get();
++                if (r.m_initialized)
++                    viSetLayerPosition(&r.m_layer, x, y);
++            }
++
+         private:
+             Renderer() {}
+ 
