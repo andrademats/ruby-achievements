@@ -1,7 +1,7 @@
 #pragma once
 #include <stddef.h>
 
-// Troca dos binários pela atualização do app (aba Atualização). Usado pelo app (download e
+// Troca dos binários pela atualização do app (aba App). Usado pelo app (download e
 // troca) e pelo sysmodule (recuperação no boot). Sem exceções nem alocação grande.
 //
 // Só os arquivos da lista fixa abaixo podem ser trocados; o manifesto da release não

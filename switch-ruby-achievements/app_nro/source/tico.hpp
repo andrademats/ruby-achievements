@@ -42,14 +42,10 @@ extern const char* const kGlyphMinus;
 namespace icon {
 constexpr const char* kInfo = "";
 constexpr const char* kStar = "";
-constexpr const char* kDelete = "";
-constexpr const char* kHistory = "";
-constexpr const char* kTimerOff = "";
-constexpr const char* kTune = "";
+constexpr const char* kTune = "";        // tune (aba Gerenciamento)
 constexpr const char* kKey = "\uE0DA";      // vpn_key (aba Chaves)
 constexpr const char* kPalette = "\uE40A";  // palette (aba Interface)
 constexpr const char* kSchedule = "\uE8B5";  // schedule (tempo total na barra lateral)
-constexpr const char* kUpdate = "\uE923";    // update (aba Atualiza\u00E7\u00E3o)
 }  // namespace icon
 
 // Tempo para animações em microssegundos (relógio do Borealis) e em segundos.
@@ -120,7 +116,7 @@ public:
 // Título de seção acima de um painel ("Scrapers", "RetroAchievements").
 brls::Label* section(const std::string& text);
 
-// --- Abas das Configurações globais: todas seguem o molde da aba Sobre -------------
+// --- Abas das Configurações globais: todas seguem o molde da aba App ---------------
 // Título de seção (17 px, cinza) acima de cada cartão; cartão justo nas células (6 px
 // em cima e embaixo, o texto corrido traz 12 px de respiro); textos e células em
 // 18 px, com o texto alinhado ao título das

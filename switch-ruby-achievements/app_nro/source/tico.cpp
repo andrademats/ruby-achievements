@@ -436,7 +436,7 @@ brls::Label* section(const std::string& text) {
 namespace {
 // Recuo do texto das células do Borealis (DetailCell); o texto corrido usa o mesmo.
 float cell_indent() { return brls::Application::getStyle()["brls/listitem/descriptionIndent"]; }
-constexpr float kCardTextX = 22;  // texto a 22 px da borda do cartão (aba Sobre)
+constexpr float kCardTextX = 22;  // texto a 22 px da borda do cartão (aba App)
 // Folga vertical do cartão: justa nas células (só o espaço da borda de foco); o texto
 // corrido traz o próprio respiro (kCardTextY), para o cartão de texto não ficar colado.
 constexpr float kCardPadY = 6;

@@ -46,11 +46,14 @@
 {"Sessões", "Sessions"},
 
 // --- Configurações globais -------------------------------------------------------
-{"Sobre", "About"},
 {"Conquistas", "Achievements"},
 {"Desinstalados", "Uninstalled"},
 {"Sessões fantasmas", "Ghost sessions"},
 {"Desativados", "Disabled"},
+{"Gerenciamento", "Management"},
+{"Jogos e sessões", "Games and sessions"},
+{"Jogos desativados", "Disabled games"},
+{"App", "App"},
 {"Interface", "Interface"},
 {"Chaves", "Keys"},
 
@@ -199,10 +202,10 @@
 {"Usuário e chave da Web API", "Username and Web API key"},
 {"Importação concluída.\n\n%d sessões importadas, %s no total, de %d perfil(is).\n"
  "%d sessões já estavam no Ruby Achievements; %d jogo(s) novo(s) na biblioteca; %d não instalado(s) "
- "(aba Desinstalados).\n(%d jogos consultados. Detalhes: /switch/ruby_achievements/import.log)",
+ "(Gerenciamento > Jogos desinstalados).\n(%d jogos consultados. Detalhes: /switch/ruby_achievements/import.log)",
  "Import finished.\n\n%d sessions imported, %s in total, from %d profile(s).\n"
  "%d sessions were already in Ruby Achievements; %d new game(s) in the library; %d not installed "
- "(Uninstalled tab).\n(%d games checked. Details: /switch/ruby_achievements/import.log)"},
+ "(Management > Uninstalled games).\n(%d games checked. Details: /switch/ruby_achievements/import.log)"},
 {"Bem-vindo ao Ruby Achievements!\n\nQuer importar o tempo que o Switch já registrou dos seus jogos "
  "(a mesma fonte do NX Activity Log)?",
  "Welcome to Ruby Achievements!\n\nDo you want to import the playtime the Switch has already recorded for your "
@@ -269,9 +272,9 @@
 {"Reassociar", "Reassign"},
 {"Sessões reassociadas", "Sessions reassigned"},
 {"Desativar o tracking de tempo de %s?\n\nO tempo dele deixa de ser contado e ele sai da tela inicial. As "
- "sessões já gravadas ficam guardadas. Para reativar: engrenagem do menu + > Desativados.",
+ "sessões já gravadas ficam guardadas. Para reativar: engrenagem do menu + > Gerenciamento > Jogos desativados.",
  "Disable time tracking for %s?\n\nIts time will no longer be counted and it leaves the home screen. Sessions "
- "already recorded are kept. To re-enable: gear in the + menu > Disabled."},
+ "already recorded are kept. To re-enable: gear in the + menu > Management > Disabled games."},
 {"Desativar", "Disable"},
 {"%s desativado", "%s disabled"},
 {"Nenhum outro jogo disponível.", "No other game available."},
@@ -396,9 +399,9 @@
 {"Não foi possível gravar em %s.", "Could not write to %s."},
 {"Pacote criado, mas o ícone não pôde ser copiado de %s.", "Package created, but the icon could not be copied from %s."},
 
-// --- Atualização (aba Atualização, update.cpp, http.cpp) ---------------------------
-{"Ruby Achievements %s — usa a internet só quando você pede: capas do SteamGridDB, RetroAchievements e a aba Atualização.",
- "Ruby Achievements %s — uses the internet only when you ask: SteamGridDB covers, RetroAchievements and the Update tab."},
+// --- Atualização (aba App, update.cpp, http.cpp) ---------------------------
+{"Ruby Achievements %s — usa a internet só quando você pede: capas do SteamGridDB, RetroAchievements e a busca por atualizações.",
+ "Ruby Achievements %s — uses the internet only when you ask: SteamGridDB covers, RetroAchievements and update checks."},
 {"Não foi possível criar %s.",
  "Could not create %s."},
 {"Arquivo maior que o esperado: download recusado.",

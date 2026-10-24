@@ -8,6 +8,8 @@
 #include "pt_wav.hpp"
 #include "steamgriddb.hpp"
 #include "icon_image.hpp"
+#include "pt_update.h"
+#include "update.hpp"
 
 namespace {
 const char* import_details() {
@@ -20,16 +22,13 @@ const char* import_details() {
 
 // --- Configurações globais (engrenagem do menu +) --------------------------------
 brls::View* SettingsActivity::createContentView() {
-    // Ordem pedida em 2026-10-20 (10ª etapa); kInterfaceTab é o índice da Interface.
+    // Ordem da 21ª etapa (2026-10-24); kInterfaceTab é o índice da Interface.
     auto tabs = new tico::Tabs();
     tabs->addTab(tico::icon::kPalette, tr("Interface"), [] { return new InterfaceTab(); });
     tabs->addTab(tico::icon::kStar, tr("Conquistas"), [] { return new AchievementsTab(); });
-    tabs->addTab(tico::icon::kDelete, tr("Desinstalados"), [] { return new UninstalledTab(); });
-    tabs->addTab(tico::icon::kTimerOff, tr("Desativados"), [] { return new DisabledTab(); });
-    tabs->addTab(tico::icon::kHistory, tr("Sessões fantasmas"), [] { return new GhostsTab(); });
+    tabs->addTab(tico::icon::kTune, tr("Gerenciamento"), [] { return new ManageTab(); });
     tabs->addTab(tico::icon::kKey, tr("Chaves"), [] { return new KeysTab(); });
-    tabs->addTab(tico::icon::kUpdate, tr("Atualização"), [] { return new UpdateTab(); });
-    tabs->addTab(tico::icon::kInfo, tr("Sobre"), [] { return new AboutTab(); });
+    tabs->addTab(tico::icon::kInfo, tr("App"), [] { return new AppTab(); });
     tabs->select(m_initial_tab);
     return tabs;
 }
@@ -500,8 +499,28 @@ void GhostInstallActivity::finish(bool ok, const std::string& message, bool need
     brls::Application::giveFocus(cell);
 }
 
-// --- Sobre ---------------------------------------------------------------------------
-AboutTab::AboutTab() : tico::Page(true) {
+// --- Gerenciamento: atalhos para as telas de manutenção ----------------------------
+namespace {
+// Abre uma página das Configurações em tela cheia; B volta para a aba Gerenciamento.
+brls::DetailCell* page_link(const std::string& title, std::function<brls::View*()> make) {
+    auto cell = tico::cell(title);
+    cell->registerClickAction([title, make](brls::View*) {
+        brls::Application::pushActivity(new brls::Activity(new tico::Frame(make(), title, tico::Backdrop::SETTINGS)));
+        return true;
+    });
+    return cell;
+}
+}  // namespace
+
+ManageTab::ManageTab() : tico::Page(true) {
+    auto card = add_card(tr("Jogos e sessões"));
+    card->addView(page_link(tr("Jogos desinstalados"), [] { return new UninstalledTab(); }));
+    card->addView(page_link(tr("Jogos desativados"), [] { return new DisabledTab(); }));
+    card->addView(page_link(tr("Sessões fantasmas"), [] { return new GhostsTab(); }));
+}
+
+// --- App: sobre, versão e atualização ------------------------------------------------
+AppTab::AppTab() : tico::Page(true) {
     auto panel = add_card("Ruby Achievements");
 
     PtStatus st;
@@ -513,7 +532,7 @@ AboutTab::AboutTab() : tico::Page(true) {
 
     const std::string lines[] = {
         trf("Ruby Achievements %s — usa a internet só quando você pede: capas do SteamGridDB, "
-            "RetroAchievements e a aba Atualização.", PT_VERSION),
+            "RetroAchievements e a busca por atualizações.", PT_VERSION),
         "",
         sys,
         "",
@@ -527,6 +546,28 @@ AboutTab::AboutTab() : tico::Page(true) {
     std::string text;  // um texto só: o respiro do card_text não se repete entre as linhas
     for (const std::string& l : lines) text += (text.empty() ? "" : "\n") + l;
     panel->addView(tico::card_text(text));
+
+    auto version = add_card(tr("Versão"));
+    version->addView(tico::cell(tr("Versão instalada"), upd::to_string(upd::current())));
+    char pending[32];
+    if (pt_update_pending(pending, sizeof(pending)))
+        version->addView(tico::card_text(
+            trf("A versão %s já foi instalada. Reinicie o console para usá-la: o app, o overlay e o sysmodule só "
+                "trocam no reinício.",
+                pending)));
+
+    auto update = add_card(tr("Atualização"));
+    auto button = tico::cell(tr("Verificar e atualizar aplicativo"), "GitHub");
+    button->registerClickAction([](brls::View*) {
+        brls::Application::pushActivity(new UpdateActivity());
+        return true;
+    });
+    update->addView(button);
+    update->addView(tico::card_text(
+        tr("Consulta a última versão publicada no GitHub. A instalação confere a assinatura do pacote e o SHA-256 de "
+           "cada arquivo antes de trocar o app, o overlay e o sysmodule. Banco de dados, histórico, capas, sons, "
+           "pacotes de conquistas, config.ini e secrets.ini não são tocados, e o banco ganha uma cópia de "
+           "segurança antes. Se a troca for interrompida, a versão anterior volta sozinha.")));
 }
 
 // --- Chaves (antiga Preferências): importação, SteamGridDB e RetroAchievements ------
@@ -576,7 +617,7 @@ void ui::run_import() {
     HomeActivity::request_refresh();
     tico::message(trf("Importação concluída.\n\n%d sessões importadas, %s no total, de %d perfil(is).\n"
                       "%d sessões já estavam no Ruby Achievements; %d jogo(s) novo(s) na biblioteca; %d não instalado(s) "
-                      "(aba Desinstalados).\n(%d jogos consultados. Detalhes: /switch/ruby_achievements/import.log)",
+                      "(Gerenciamento > Jogos desinstalados).\n(%d jogos consultados. Detalhes: /switch/ruby_achievements/import.log)",
                       (int)r.sessions, data::format_duration(r.seconds).c_str(), (int)r.users, (int)r.skipped,
                       (int)r.new_games, (int)r.uninstalled, (int)r.titles));
 }

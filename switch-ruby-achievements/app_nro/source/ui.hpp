@@ -68,9 +68,9 @@ public:
     static void reload();
 };
 
-// Configurações globais (engrenagem do menu +), nesta ordem: Interface,
-// Conquistas, Desinstalados, Desativados, Sessões fantasmas, Chaves, Atualização e Sobre.
-// Todas as abas são tico::Page (molde da aba Sobre).
+// Configurações globais (engrenagem do menu +), nesta ordem: Interface, Conquistas,
+// Gerenciamento, Chaves e App. Todas as abas são tico::Page (molde da aba App).
+// Desinstalados, Desativados e Sessões fantasmas abrem pela aba Gerenciamento, em tela cheia.
 class SettingsActivity : public brls::Activity {
 public:
     static constexpr int kInterfaceTab = 0;  // índice da aba Interface
@@ -188,16 +188,17 @@ private:
     brls::DetailCell* m_key = nullptr;
 };
 
-class AboutTab : public tico::Page {
+// Atalhos para Jogos desinstalados, Jogos desativados e Sessões fantasmas.
+class ManageTab : public tico::Page {
 public:
-    AboutTab();
+    ManageTab();
 };
 
-// Atualização: versão instalada, aviso de reinício pendente e o botão que abre a
-// UpdateActivity (update.hpp).
-class UpdateTab : public tico::Page {
+// Sobre (versão, sysmodule, caminhos), versão instalada, aviso de reinício pendente e o
+// botão que abre a UpdateActivity (update.hpp).
+class AppTab : public tico::Page {
 public:
-    UpdateTab();
+    AppTab();
 };
 
 // Consulta a última versão no GitHub e, se o usuário confirmar, baixa, confere e instala

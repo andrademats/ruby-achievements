@@ -1,4 +1,4 @@
-// Aba Atualização das Configurações e a tela que consulta, baixa e instala (update.hpp).
+// Tela que consulta, baixa e instala a atualização (update.hpp); abre pela aba App.
 #include "i18n.hpp"
 #include "pt_paths.h"
 #include "pt_update.h"
@@ -11,31 +11,6 @@
 struct UpdateState {
     upd::Check check;
 };
-
-// --- Aba ---------------------------------------------------------------------------------
-UpdateTab::UpdateTab() : tico::Page(true) {
-    auto version = add_card(tr("Versão"));
-    version->addView(tico::cell(tr("Versão instalada"), upd::to_string(upd::current())));
-    char pending[32];
-    if (pt_update_pending(pending, sizeof(pending)))
-        version->addView(tico::card_text(
-            trf("A versão %s já foi instalada. Reinicie o console para usá-la: o app, o overlay e o sysmodule só "
-                "trocam no reinício.",
-                pending)));
-
-    auto update = add_card(tr("Atualização"));
-    auto button = tico::cell(tr("Verificar e atualizar aplicativo"), "GitHub");
-    button->registerClickAction([](brls::View*) {
-        brls::Application::pushActivity(new UpdateActivity());
-        return true;
-    });
-    update->addView(button);
-    update->addView(tico::card_text(
-        tr("Consulta a última versão publicada no GitHub. A instalação confere a assinatura do pacote e o SHA-256 de "
-           "cada arquivo antes de trocar o app, o overlay e o sysmodule. Banco de dados, histórico, capas, sons, "
-           "pacotes de conquistas, config.ini e secrets.ini não são tocados, e o banco ganha uma cópia de "
-           "segurança antes. Se a troca for interrompida, a versão anterior volta sozinha.")));
-}
 
 // --- Tela --------------------------------------------------------------------------------
 UpdateActivity::UpdateActivity() : m_alive(std::make_shared<bool>(true)), m_state(std::make_shared<UpdateState>()) {}

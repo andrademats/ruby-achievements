@@ -96,7 +96,7 @@ void disable_tracking(const GameRow& g, std::function<void()> changed) {
     int64_t id = g.id;
     std::string name = g.name;
     ui::confirm(trf("Desativar o tracking de tempo de %s?\n\nO tempo dele deixa de ser contado e ele sai da tela "
-                    "inicial. As sessões já gravadas ficam guardadas. Para reativar: engrenagem do menu + > Desativados.",
+                    "inicial. As sessões já gravadas ficam guardadas. Para reativar: engrenagem do menu + > Gerenciamento > Jogos desativados.",
                     name.c_str()),
                 tr("Desativar"), [id, name, changed] {
                     if (!ui::report(data::set_tracking(id, false), trf("%s desativado", name.c_str()))) return;

@@ -17,7 +17,7 @@
 
 namespace upd {
 
-// Repositório público das releases (vazio = a aba Atualização avisa que não está configurada).
+// Repositório público das releases (vazio = a aba App avisa que não está configurada).
 const char* const kRepo = "andrademats/ruby-achievements";
 
 namespace {
