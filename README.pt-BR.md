@@ -15,9 +15,11 @@ o RetroAchievements e a aba Atualização.
 
 Requer Atmosphère. O overlay também precisa do nx-ovlloader com o Tesla Menu ou o Ultrahand.
 
-1. Baixe a [release](https://github.com/andrademats/ruby-achievements/releases) mais recente ou
-   compile o `dist/` (abaixo).
-2. Copie o conteúdo de `dist/` para a raiz do cartão SD.
+1. Baixe o `ruby-achievements-vX.Y.Z.zip` da
+   [release](https://github.com/andrademats/ruby-achievements/releases) mais recente ou compile o
+   `dist/` (abaixo).
+2. Extraia o zip (ou copie o conteúdo de `dist/`) para a raiz do cartão SD. Os arquivos
+   `manifest.json` e `manifest.sig` da release são da atualização pelo app.
 3. Reinicie o console e abra o **Ruby Achievements** pelo Homebrew Menu.
 
 ## Compilação

@@ -22,7 +22,7 @@
 int pt_update_target_count(void);
 // Caminho relativo à raiz do SD, como no manifesto: "switch/ruby_achievements/ruby_achievements.nro".
 const char* pt_update_target_rel(int i);
-// Nome do asset na release e do arquivo em staging/ e backup/ (único na lista).
+// Nome do arquivo em staging/ e backup/ (único na lista).
 const char* pt_update_target_name(int i);
 // Índice do destino com esse caminho exato, ou -1 (fora da lista).
 int pt_update_target_find(const char* rel);
@@ -33,7 +33,7 @@ void pt_update_staged_path(int i, char* out, size_t cap);
 // 1 se o destino existe no SD.
 int pt_update_target_installed(int i);
 
-// Cria as pastas da atualização e esvazia staging/. 0 = ok.
+// Cria as pastas da atualização e esvazia staging/ (binários e o zip). 0 = ok.
 int pt_update_prepare_staging(void);
 
 // Troca os `n` destinos (índices) pelos arquivos de staging/. Todos precisam existir no SD e em

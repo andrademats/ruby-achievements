@@ -3,10 +3,12 @@
 //
 // 1. check(): consulta releases/latest de kRepo, baixa os assets manifest.json e manifest.sig,
 //    confere a assinatura Ed25519 com a chave pública embutida (update_key.inc) e valida o
-//    manifesto (versão, destinos só da lista fixa de pt_update.h, tamanho e SHA-256 de cada um).
-// 2. install(): baixa cada binário instalado neste SD para staging/ (sem passar do tamanho do
-//    manifesto), confere tamanho e SHA-256 de todos, copia o banco para o backup (com o lock) e
-//    só então troca os arquivos (pt_update_apply, com diário e recuperação).
+//    manifesto (versão, pacote zip, destinos só da lista fixa de pt_update.h, tamanho e SHA-256
+//    de cada um).
+// 2. install(): baixa o zip da release para staging/ (sem passar do tamanho do manifesto),
+//    confere tamanho e SHA-256 dele, extrai só os binários instalados neste SD, confere tamanho
+//    e SHA-256 de cada um, copia o banco para o backup (com o lock) e só então troca os arquivos
+//    (pt_update_apply, com diário e recuperação).
 // A versão nova vale depois de reiniciar o console (sysmodule e overlay ficam carregados).
 //
 // Bloqueante: chamar fora do thread da UI.
@@ -33,10 +35,16 @@ struct ManifestFile {
     std::string path, sha256;
     uint64_t size = 0;
 };
+// Zip da release (o dist/ inteiro, sem compressão), baixado como asset com este nome.
+struct Package {
+    std::string name, sha256;
+    uint64_t size = 0;
+};
 struct Manifest {
     Version version, min_version;
     std::string notes;
-    std::vector<ManifestFile> files;
+    Package package;
+    std::vector<ManifestFile> files;  // caminho = nome da entrada no zip
 };
 // Valida tudo; qualquer coisa fora do esperado recusa o manifesto inteiro.
 bool parse_manifest(const std::string& json, Manifest& out, std::string& error);
@@ -75,6 +83,10 @@ using Progress = std::function<void(const std::string& step)>;
 bool install(const Check& c, const Progress& progress, std::string& error);
 
 // Partes do install() sem rede (testadas no PC).
+// Copia a entrada `entry` de um zip sem compressão para `out_path`; recusa se a entrada faltar,
+// estiver comprimida ou cifrada, ou não tiver exatamente `size` bytes.
+bool extract_stored(const std::string& zip_path, const std::string& entry, const std::string& out_path, uint64_t size,
+                    std::string& error);
 bool verify_staged(const Manifest& m, const std::vector<int>& targets, std::string& error);
 bool backup_database(std::string& error);  // PT_DB_PATH -> PT_UPDATE_DB_BACKUP_PATH, com o lock
 

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Manifesto assinado da atualização automática (aba Atualização do app).
 
-O app baixa da última release do GitHub dois assets, `manifest.json` e `manifest.sig`, confere a
-assinatura Ed25519 com a chave pública embutida (app_nro/source/update_key.inc) e só então baixa os
-binários listados, conferindo tamanho e SHA-256 de cada um.
+A release tem três assets: o pacote `ruby-achievements-vX.Y.Z.zip` (o `dist/` inteiro, que é o que
+uma pessoa baixa para instalar), `manifest.json` e `manifest.sig`. O app baixa os dois do manifesto,
+confere a assinatura Ed25519 com a chave pública embutida (app_nro/source/update_key.inc), baixa o
+zip conferindo tamanho e SHA-256 e extrai dele só os binários da lista fixa, conferindo cada um.
+O zip é gravado sem compressão (ZIP_STORED): o app só copia os bytes, sem descompactar.
 
 Comandos:
   keygen <arquivo>       cria a chave privada (32 bytes em hex) FORA do repositório e grava
                          app_nro/source/update_key.inc com a chave pública
   pubkey <arquivo>       mostra a chave pública de uma chave privada
   make --key <arquivo> [--dist DIR] [--out DIR] [--min X.Y.Z] [--notes TEXTO]
-                         gera manifest.json, manifest.sig e os assets (versão do arquivo VERSION)
+                         gera o zip, manifest.json e manifest.sig (versão do arquivo VERSION)
   selftest               confere o Ed25519 com os vetores da RFC 8032
 
 Sem dependências: Ed25519 é a implementação de referência da RFC 8032 (seção 6), lenta mas
@@ -20,8 +22,8 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import sys
+import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # switch-ruby-achievements/
 
@@ -221,17 +223,27 @@ def cmd_make(args):
         version = parse_version(f.read())
     secret = read_secret(args.key)
     files = []
-    os.makedirs(args.out, exist_ok=True)
-    for rel, name in TARGETS:
+    for rel, _ in TARGETS:
         src = os.path.join(args.dist, *rel.split("/"))
         if not os.path.isfile(src):
             sys.exit(f"falta no dist: {rel} (rode make dist)")
         with open(src, "rb") as f:
             data = f.read()
         files.append({"path": rel, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-        shutil.copyfile(src, os.path.join(args.out, name))
+    os.makedirs(args.out, exist_ok=True)
+    zip_name = f"ruby-achievements-v{version}.zip"
+    zip_path = os.path.join(args.out, zip_name)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
+        for dirpath, dirnames, filenames in os.walk(args.dist):
+            dirnames.sort()
+            for name in sorted(filenames):
+                full = os.path.join(dirpath, name)
+                z.write(full, os.path.relpath(full, args.dist).replace(os.sep, "/"))
+    with open(zip_path, "rb") as f:
+        data = f.read()
+    package = {"name": zip_name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     manifest = {"version": version, "min_version": parse_version(args.min) if args.min else "0.0.0",
-                "notes": args.notes or "", "files": files}
+                "notes": args.notes or "", "package": package, "files": files}
     raw = (json.dumps(manifest, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
     sig = sign(secret, raw)
     if not verify(public_key(secret), raw, sig):
@@ -240,9 +252,9 @@ def cmd_make(args):
         f.write(raw)
     with open(os.path.join(args.out, "manifest.sig"), "w", encoding="ascii", newline="\n") as f:
         f.write(sig.hex() + "\n")
-    print(f"versão {version}: {len(files)} arquivos, manifesto assinado em {args.out}")
+    print(f"versão {version}: {zip_name} ({len(data)} bytes), manifesto assinado em {args.out}")
     print("chave pública:", public_key(secret).hex())
-    print(f"publique os {len(files) + 2} arquivos da pasta como assets da release v{version}")
+    print(f"publique {zip_name}, manifest.json e manifest.sig como assets da release v{version}")
 
 
 def main():

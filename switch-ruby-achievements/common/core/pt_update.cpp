@@ -15,7 +15,7 @@ namespace {
 
 struct Target {
     const char* rel;   // relativo à raiz do SD
-    const char* name;  // asset da release e arquivo em staging/ e backup/
+    const char* name;  // arquivo em staging/ e backup/
 };
 
 // Lista fixa. Sem boot2.flag de propósito: se o usuário o apagou (sysmodule sem iniciar no
@@ -81,6 +81,7 @@ int pt_update_target_installed(int i) {
 int pt_update_prepare_staging(void) {
     ensure_dirs();
     clear_dir(PT_UPDATE_STAGING_DIR);
+    unlink(PT_UPDATE_PACKAGE_PATH);
     struct stat st;
     return stat(PT_UPDATE_STAGING_DIR, &st) == 0 && S_ISDIR(st.st_mode) ? 0 : -1;
 }

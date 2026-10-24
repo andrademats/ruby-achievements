@@ -1,6 +1,10 @@
 // Atualização do app: versão, manifesto, assinatura Ed25519 (Monocypher, compatível com a
-// ferramenta tools/release_manifest.py), SHA-256, download conferido, troca com diário e
-// backup, recuperação de troca interrompida e dados do usuário intocados.
+// ferramenta tools/release_manifest.py), SHA-256, zip da release conferido e extraído, troca com
+// diário e backup, recuperação de troca interrompida e dados do usuário intocados.
+//
+// update_fixture/ (manifest.json, manifest.sig, o zip e test_public.hex) é gerado pela própria
+// tools/release_manifest.py com VERSION 9.9.9 e uma chave de teste descartável, a partir dos
+// binários falsos de update_fixture/assets/ (mais um boot2.flag e um sfx/LEIA-ME.txt no zip).
 #include "pt_paths.h"
 #include "pt_update.h"
 #include "pt_util.h"
@@ -85,13 +89,15 @@ static bool all_old() {
 }
 
 // Release falsa com os assets da fixture (servidos pelo http_fake).
+static const std::string kZip = "ruby-achievements-v9.9.9.zip";
+static const std::string kZipUrl = "https://example.test/download/" + kZip;
 static upd::Check fixture_check() {
     upd::Check c;
     std::string err;
     upd::parse_manifest(fixture("manifest.json"), c.manifest, err);
-    for (int i = 0; i < pt_update_target_count(); i++) {
-        std::string name = pt_update_target_name(i), url = "https://example.test/download/" + name;
-        g_http[url] = fixture("assets/" + name);
+    for (const std::string name : {std::string("manifest.json"), std::string("manifest.sig"), kZip}) {
+        std::string url = "https://example.test/download/" + name;
+        g_http[url] = fixture(name);
         c.release.assets.push_back({name, url, (uint64_t)g_http[url].size()});
     }
     c.newer = upd::compare(c.manifest.version, upd::current()) > 0;
@@ -169,11 +175,29 @@ int main() {
     upd::Manifest m;
     std::string err;
     check("manifesto da fixture válido", upd::parse_manifest(man, m, err) && m.files.size() == 4 &&
-                                             upd::to_string(m.version) == "9.9.9" && m.notes == "Versão de teste.");
-    auto with_file = [](const std::string& entry) {
-        return "{\"version\":\"9.9.9\",\"files\":[" + entry + "]}";
-    };
+                                             upd::to_string(m.version) == "9.9.9" && m.notes == "Versão de teste." &&
+                                             m.package.name == kZip && m.package.size == fixture(kZip).size());
     const std::string sha = std::string(64, 'a');
+    const std::string good_pkg = "{\"name\":\"pacote-v1.zip\",\"size\":100,\"sha256\":\"" + sha + "\"}";
+    auto with_file = [&](const std::string& entry) {
+        return "{\"version\":\"9.9.9\",\"package\":" + good_pkg + ",\"files\":[" + entry + "]}";
+    };
+    const std::string ovl_entry = "{\"path\":\"switch/.overlays/ruby-achievements-overlay.ovl\",\"size\":10,\"sha256\":\"" + sha + "\"}";
+    auto with_pkg = [&](const std::string& pkg) {
+        return "{\"version\":\"9.9.9\"" + (pkg.empty() ? std::string() : ",\"package\":" + pkg) + ",\"files\":[" + ovl_entry + "]}";
+    };
+    auto pkg = [&](const std::string& name, const std::string& size = "100", const std::string& h = "") {
+        return "{\"name\":\"" + name + "\",\"size\":" + size + ",\"sha256\":\"" + (h.empty() ? sha : h) + "\"}";
+    };
+    check("pacote válido aceito", upd::parse_manifest(with_pkg(good_pkg), m, err));
+    check("recusa manifesto sem pacote", !upd::parse_manifest(with_pkg(""), m, err));
+    check("recusa nome de pacote com caminho ou sem .zip",
+          !upd::parse_manifest(with_pkg(pkg("../x.zip")), m, err) && !upd::parse_manifest(with_pkg(pkg("a/x.zip")), m, err) &&
+              !upd::parse_manifest(with_pkg(pkg("x.exe")), m, err) && !upd::parse_manifest(with_pkg(pkg(".zip")), m, err));
+    check("recusa pacote com tamanho 0 ou > 128 MB e sha256 ruim",
+          !upd::parse_manifest(with_pkg(pkg("x.zip", "0")), m, err) &&
+              !upd::parse_manifest(with_pkg(pkg("x.zip", "134217729")), m, err) &&
+              !upd::parse_manifest(with_pkg(pkg("x.zip", "100", std::string(63, 'a'))), m, err));
     auto entry = [&](const std::string& path, const std::string& size = "10", const std::string& h = "") {
         return "{\"path\":\"" + path + "\",\"size\":" + size + ",\"sha256\":\"" + (h.empty() ? sha : h) + "\"}";
     };
@@ -195,8 +219,8 @@ int main() {
               !upd::parse_manifest(with_file(entry(nro, "\"10\"")), m, err) &&
               !upd::parse_manifest(with_file(entry(nro, "67108865")), m, err));
     check("recusa sem arquivos, versão ruim ou JSON quebrado",
-          !upd::parse_manifest("{\"version\":\"9.9.9\",\"files\":[]}", m, err) &&
-              !upd::parse_manifest("{\"version\":\"9.9\",\"files\":[" + entry(nro) + "]}", m, err) &&
+          !upd::parse_manifest("{\"version\":\"9.9.9\",\"package\":" + good_pkg + ",\"files\":[]}", m, err) &&
+              !upd::parse_manifest("{\"version\":\"9.9\",\"package\":" + good_pkg + ",\"files\":[" + entry(nro) + "]}", m, err) &&
               !upd::parse_manifest("{\"version\":", m, err) && !upd::parse_manifest("[]", m, err));
 
     // --- Release do GitHub ---
@@ -220,6 +244,39 @@ int main() {
     check("destinos: 4, nomes únicos, busca exata", pt_update_target_count() == 4 && unique &&
                                                        pt_update_target_find("switch/ruby_achievements/ruby_achievements.db") == -1);
 
+    // --- Extração do zip da release (sem compressão) ---
+    const std::string zip = fixture(kZip), zpath = "sdmc:/pacote.zip", out = "sdmc:/extraido.bin";
+    put(zpath, zip);
+    bool all_ok = true;
+    for (int i = 0; i < pt_update_target_count(); i++) {
+        std::string asset = fixture(std::string("assets/") + pt_update_target_name(i));
+        unlink(out.c_str());
+        all_ok = all_ok && upd::extract_stored(zpath, pt_update_target_rel(i), out, asset.size(), err) && slurp(out) == asset;
+    }
+    check("zip: os 4 binários extraídos iguais aos originais", all_ok);
+    const std::string nro_rel = "switch/ruby_achievements/ruby_achievements.nro";
+    const uint64_t nro_size = fixture("assets/ruby_achievements.nro").size();
+    check("zip: entrada ausente recusada", !upd::extract_stored(zpath, "switch/nao_existe.nro", out, 10, err) &&
+                                               err.find("nao_existe") != std::string::npos);
+    check("zip: tamanho diferente do manifesto recusado", !upd::extract_stored(zpath, nro_rel, out, nro_size + 1, err));
+    std::string compressed = zip;
+    size_t cdh = compressed.find("PK\x01\x02");
+    while (cdh != std::string::npos && compressed.compare(cdh + 46, nro_rel.size(), nro_rel) != 0)
+        cdh = compressed.find("PK\x01\x02", cdh + 4);
+    check("zip: fixture tem a entrada do nro no diretório central", cdh != std::string::npos);
+    if (cdh != std::string::npos) {
+        compressed[cdh + 10] = 8;  // método deflate
+        put(zpath, compressed);
+        check("zip: entrada comprimida recusada", !upd::extract_stored(zpath, nro_rel, out, nro_size, err));
+    }
+    put(zpath, zip.substr(0, zip.size() / 2));
+    check("zip: arquivo cortado recusado", !upd::extract_stored(zpath, nro_rel, out, nro_size, err));
+    put(zpath, "isto não é um zip, só um texto qualquer");
+    check("zip: arquivo que não é zip recusado", !upd::extract_stored(zpath, nro_rel, out, nro_size, err));
+    check("zip: arquivo ausente recusado", !upd::extract_stored("sdmc:/nao_existe.zip", nro_rel, out, nro_size, err));
+    unlink(zpath.c_str());
+    unlink(out.c_str());
+
     // --- Instalação de ponta a ponta (HTTP falso) ---
     reset_sd();
     upd::Check c = fixture_check();
@@ -242,30 +299,35 @@ int main() {
     char pend[32] = "";
     check("install: diário apagado, reinício pendente 9.9.9",
           !exists(PT_UPDATE_JOURNAL_PATH) && pt_update_pending(pend, sizeof(pend)) == 1 && !strcmp(pend, "9.9.9"));
-    check("install: passos mostrados (3 downloads + conferir + banco + instalar)", steps.size() == 6);
+    check("install: passos mostrados (baixar + extrair + conferir + banco + instalar)", steps.size() == 5);
+    check("install: zip apagado do staging", !exists(PT_UPDATE_PACKAGE_PATH));
     pt_update_boot_done();
     check("boot do sysmodule: marca de reinício sai", pt_update_pending(pend, sizeof(pend)) == 0);
 
     // Download adulterado (mesmo tamanho, outro conteúdo): nada é trocado.
     reset_sd();
     c = fixture_check();
-    std::string& ovl = g_http["https://example.test/download/ruby-achievements-overlay.ovl"];
-    ovl[0] ^= 1;
-    check("adulterado: recusado", !upd::install(c, [](const std::string&) {}, err) && err.find("ruby-achievements-overlay.ovl") != std::string::npos);
+    std::string& z = g_http[kZipUrl];
+    z[z.find("binario falso")] ^= 1;  // um byte dentro de um dos binários falsos
+    check("adulterado: recusado", !upd::install(c, [](const std::string&) {}, err) && err.find(kZip) != std::string::npos);
     check("adulterado: nada trocado, sem diário nem reinício pendente",
           all_old() && !exists(PT_UPDATE_JOURNAL_PATH) && !pt_update_pending(nullptr, 0) && user_files_intact());
+    check("adulterado: zip apagado do staging", !exists(PT_UPDATE_PACKAGE_PATH));
 
-    // Asset maior que o manifesto: o download para no limite.
+    // Zip maior que o manifesto: o download para no limite.
     reset_sd();
     c = fixture_check();
-    g_http["https://example.test/download/exefs.nsp"] += "lixo a mais";
-    check("asset grande demais: recusado, nada trocado", !upd::install(c, [](const std::string&) {}, err) && all_old());
+    g_http[kZipUrl] += "lixo a mais";
+    check("zip grande demais: recusado, nada trocado", !upd::install(c, [](const std::string&) {}, err) && all_old());
 
-    // Release sem um dos binários do manifesto.
+    // Release sem o zip do manifesto.
     reset_sd();
     c = fixture_check();
-    c.release.assets.erase(c.release.assets.begin());
-    check("asset ausente na release: recusado, nada trocado", !upd::install(c, [](const std::string&) {}, err) && all_old());
+    for (size_t i = 0; i < c.release.assets.size(); i++)
+        if (c.release.assets[i].name == kZip) c.release.assets.erase(c.release.assets.begin() + i);
+    int before_missing = g_http_downloads;
+    check("zip ausente na release: recusado sem baixar, nada trocado",
+          !upd::install(c, [](const std::string&) {}, err) && all_old() && g_http_downloads == before_missing);
 
     // Sem versão nova / versão instalada velha demais: nem baixa.
     reset_sd();

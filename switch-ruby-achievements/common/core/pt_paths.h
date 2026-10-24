@@ -44,6 +44,7 @@
 // troca (enquanto existe, a troca não terminou) e a marca "reinicie o console".
 #define PT_UPDATE_DIR          PT_DIR "/update"
 #define PT_UPDATE_STAGING_DIR  PT_UPDATE_DIR "/staging"
+#define PT_UPDATE_PACKAGE_PATH PT_UPDATE_STAGING_DIR "/package.zip" // zip da release, apagado depois de extrair
 #define PT_UPDATE_BACKUP_DIR   PT_UPDATE_DIR "/backup"
 #define PT_UPDATE_JOURNAL_PATH PT_UPDATE_DIR "/journal.txt"
 #define PT_UPDATE_PENDING_PATH PT_UPDATE_DIR "/pending_reboot.txt"

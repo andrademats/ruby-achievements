@@ -2,6 +2,11 @@
  "version": "9.9.9",
  "min_version": "0.0.0",
  "notes": "Versão de teste.",
+ "package": {
+  "name": "ruby-achievements-v9.9.9.zip",
+  "size": 1311,
+  "sha256": "d0e763f70d5e5596f7b9cbf4a2f90f42a45c252ef1e15a8c6ae3cee75bbfd287"
+ },
  "files": [
   {
    "path": "switch/ruby_achievements/ruby_achievements.nro",

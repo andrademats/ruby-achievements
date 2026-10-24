@@ -10,8 +10,10 @@
 #include <nlohmann/json.hpp>
 #include <switch.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -28,7 +30,8 @@ const uint8_t kPublicKey[32] =
 #include "update_key.inc"
     ;
 
-constexpr uint64_t kMaxFileSize = 64ull << 20;  // binário mais longo aceito no manifesto
+constexpr uint64_t kMaxFileSize = 64ull << 20;      // binário mais longo aceito no manifesto
+constexpr uint64_t kMaxPackageSize = 128ull << 20;  // zip mais longo aceito no manifesto
 const std::vector<std::string> kGithubHeaders = {"Accept: application/vnd.github+json",
                                                  "X-GitHub-Api-Version: 2022-11-28"};
 
@@ -74,6 +77,23 @@ bool fetch_text(const std::string& url, size_t max, std::string& out, std::strin
 uint64_t file_size(const char* path) {
     struct stat st;
     return stat(path, &st) == 0 ? (uint64_t)st.st_size : 0;
+}
+
+// Nome de asset seguro: só [A-Za-z0-9._-], terminado em ".zip".
+bool valid_package_name(const std::string& s) {
+    if (s.size() < 5 || s.size() > 100 || s.compare(s.size() - 4, 4, ".zip") != 0) return false;
+    for (char c : s)
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+              c == '-'))
+            return false;
+    return true;
+}
+
+uint32_t le16(const unsigned char* p) { return p[0] | (p[1] << 8); }
+uint32_t le32(const unsigned char* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24); }
+
+bool read_at(FILE* f, uint64_t off, unsigned char* buf, size_t n) {
+    return fseek(f, (long)off, SEEK_SET) == 0 && fread(buf, 1, n, f) == n;
 }
 
 bool free_space_ok(uint64_t need, std::string& error) {
@@ -149,6 +169,16 @@ bool parse_manifest(const std::string& text, Manifest& out, std::string& error) 
     if (min.empty()) min = "0.0.0";
     if (!parse_version(min, out.min_version)) return bad("min_version");
     out.notes = str_field(j, "notes");
+    const json* pkg = field(j, "package");
+    if (!pkg || !pkg->is_object()) return bad("package");
+    out.package.name = str_field(*pkg, "name");
+    if (!valid_package_name(out.package.name)) return bad("package.name");
+    const json* psize = field(*pkg, "size");
+    if (!psize || !psize->is_number_unsigned()) return bad("package.size");
+    out.package.size = psize->get<uint64_t>();
+    if (out.package.size == 0 || out.package.size > kMaxPackageSize) return bad("package.size");
+    out.package.sha256 = str_field(*pkg, "sha256");
+    if (!is_hex(out.package.sha256, 64)) return bad("package.sha256");
     const json* files = field(j, "files");
     if (!files || !files->is_array() || files->empty()) return bad("files");
     for (const json& f : *files) {
@@ -274,6 +304,74 @@ bool check(Check& out, std::string& error) {
     return true;
 }
 
+bool extract_stored(const std::string& zip_path, const std::string& entry, const std::string& out_path, uint64_t size,
+                    std::string& error) {
+    auto bad = [&]() {
+        error = trf("O pacote da versão está corrompido (%s): atualização recusada.", entry.c_str());
+        return false;
+    };
+    std::unique_ptr<FILE, int (*)(FILE*)> f(fopen(zip_path.c_str(), "rb"), fclose);
+    if (!f || fseek(f.get(), 0, SEEK_END) != 0) return bad();
+    long end = ftell(f.get());
+    if (end < 22) return bad();
+    uint64_t total = (uint64_t)end;
+
+    // Fim do diretório central: nos últimos 22 bytes + comentário de até 64 KB.
+    size_t tail = (size_t)std::min<uint64_t>(total, 22 + 0xFFFF);
+    std::vector<unsigned char> t(tail);
+    if (!read_at(f.get(), total - tail, t.data(), tail)) return bad();
+    const unsigned char* eocd = nullptr;
+    for (size_t i = tail - 22 + 1; i-- > 0;)
+        if (le32(&t[i]) == 0x06054b50) {
+            eocd = &t[i];
+            break;
+        }
+    if (!eocd) return bad();
+    uint64_t cd_size = le32(eocd + 12), cd_off = le32(eocd + 16);
+    if (cd_off + cd_size > total || cd_size > (4u << 20)) return bad();
+    std::vector<unsigned char> cd(cd_size);
+    if (cd_size && !read_at(f.get(), cd_off, cd.data(), cd_size)) return bad();
+
+    for (size_t p = 0; p + 46 <= cd.size();) {
+        const unsigned char* h = &cd[p];
+        if (le32(h) != 0x02014b50) return bad();
+        size_t n = le16(h + 28), extra = le16(h + 30), comment = le16(h + 32);
+        if (p + 46 + n > cd.size()) return bad();
+        std::string name((const char*)h + 46, n);
+        p += 46 + n + extra + comment;
+        if (name != entry) continue;
+
+        uint32_t flags = le16(h + 8), method = le16(h + 10), csize = le32(h + 20), usize = le32(h + 24);
+        uint64_t local = le32(h + 42);
+        if ((flags & 1) || method != 0 || csize != usize || usize != size) return bad();  // cifrada ou comprimida
+        unsigned char lh[30];
+        if (!read_at(f.get(), local, lh, sizeof(lh)) || le32(lh) != 0x04034b50) return bad();
+        uint64_t data = local + 30 + le16(lh + 26) + le16(lh + 28);
+        if (data + size > total || fseek(f.get(), (long)data, SEEK_SET) != 0) return bad();
+
+        FILE* out = fopen(out_path.c_str(), "wb");
+        if (!out) {
+            error = trf("Não foi possível criar %s.", out_path.c_str());
+            return false;
+        }
+        std::vector<unsigned char> buf(64 * 1024);
+        bool ok = true;
+        for (uint64_t left = size; ok && left > 0;) {
+            size_t chunk = (size_t)std::min<uint64_t>(left, buf.size());
+            ok = fread(buf.data(), 1, chunk, f.get()) == chunk && fwrite(buf.data(), 1, chunk, out) == chunk;
+            left -= chunk;
+        }
+        ok = fclose(out) == 0 && ok;
+        if (!ok) {
+            unlink(out_path.c_str());
+            return bad();
+        }
+        return true;
+    }
+    error = trf("A versão publicada não traz %s: atualização recusada.", entry.c_str());
+    return false;
+}
+
 bool verify_staged(const Manifest& m, const std::vector<int>& targets, std::string& error) {
     char staged[256];
     for (int t : targets) {
@@ -334,28 +432,43 @@ std::string blocked_reason(const Check& c) {
 bool install(const Check& c, const Progress& progress, std::string& error) {
     error = blocked_reason(c);
     if (!error.empty()) return false;
-    uint64_t need = file_size(PT_DB_PATH) + (1u << 20);
+    const Package& pkg = c.manifest.package;
+    uint64_t need = file_size(PT_DB_PATH) + (1u << 20) + pkg.size;
     for (int t : c.targets) need += file_for(c.manifest, t)->size;
     if (!free_space_ok(need, error)) return false;
+    const Asset* a = find_asset(c.release, pkg.name);
+    if (!a) {
+        error = trf("A versão publicada não traz %s: atualização recusada.", pkg.name.c_str());
+        return false;
+    }
     if (pt_update_prepare_staging() != 0) {
         error = trf("Não foi possível criar %s.", PT_UPDATE_STAGING_DIR);
         return false;
     }
 
-    char staged[256];
-    int n = (int)c.targets.size();
-    for (int k = 0; k < n; k++) {
-        int t = c.targets[k];
-        const char* name = pt_update_target_name(t);
-        const Asset* a = find_asset(c.release, name);
-        if (!a) {
-            error = trf("A versão publicada não traz %s: atualização recusada.", name);
+    // Zip conferido inteiro antes de extrair; depois de extrair (ou falhar) ele sai do SD.
+    auto unpack = [&]() {
+        progress(trf("Baixando %s...", pkg.name.c_str()));
+        if (!http::download(a->url, {}, PT_UPDATE_PACKAGE_PATH, pkg.size, error)) return false;
+        if (file_size(PT_UPDATE_PACKAGE_PATH) != pkg.size || sha256_file(PT_UPDATE_PACKAGE_PATH) != pkg.sha256) {
+            error = trf("%s chegou diferente do manifesto (download corrompido ou adulterado): atualização recusada.",
+                        pkg.name.c_str());
             return false;
         }
-        progress(trf("Baixando %s (%d/%d)", name, k + 1, n));
-        pt_update_staged_path(t, staged, sizeof(staged));
-        if (!http::download(a->url, {}, staged, file_for(c.manifest, t)->size, error)) return false;
-    }
+        progress(tr("Extraindo os arquivos..."));
+        char staged[256];
+        for (int t : c.targets) {
+            const ManifestFile* f = file_for(c.manifest, t);
+            pt_update_staged_path(t, staged, sizeof(staged));
+            if (!extract_stored(PT_UPDATE_PACKAGE_PATH, f->path, staged, f->size, error)) return false;
+        }
+        return true;
+    };
+    bool unpacked = unpack();
+    unlink(PT_UPDATE_PACKAGE_PATH);
+    if (!unpacked) return false;
+
+    int n = (int)c.targets.size();
     progress(tr("Conferindo os arquivos..."));
     if (!verify_staged(c.manifest, c.targets, error)) return false;
     progress(tr("Copiando o banco de dados..."));
