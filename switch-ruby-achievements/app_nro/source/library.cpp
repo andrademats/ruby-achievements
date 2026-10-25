@@ -420,6 +420,8 @@ brls::View* GhostInstallActivity::createContentView() {
     col->addView(m_step);
 
     m_result = new brls::Label();
+    m_result->setFocusable(true);  // recebe o foco antes de o botão "prod.keys" ser apagado
+    m_result->setHideHighlight(true);
     m_result->setFontSize(18);
     m_result->setMarginTop(16);
     m_result->setText(" ");

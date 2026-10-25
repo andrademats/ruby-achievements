@@ -590,3 +590,13 @@
  "version %s"},
 {"versão desconhecida",
  "unknown version"},
+
+// --- Atualização: erros inesperados (update_ui.cpp) ---
+{"Erro inesperado (%s): %s",
+ "Unexpected error (%s): %s"},
+{"Erro inesperado (%s).",
+ "Unexpected error (%s)."},
+{"verificação",
+ "check"},
+{"instalação",
+ "installation"},
