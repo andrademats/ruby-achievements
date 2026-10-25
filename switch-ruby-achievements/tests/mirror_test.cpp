@@ -1,4 +1,5 @@
 #include "achieve.cpp"
+#include "rubydb_writer.hpp"
 #include <utime.h>
 s64 g_fake_now = 1000;
 int g_save_opens = 0;
@@ -87,6 +88,8 @@ int main() {
           "]}",
           d);
     fclose(d);
+    rubydb::from_json_file(defs_path);
+    const char* pack_path = "sdmc:/switch/ruby_achievements/achievements/01007EF00011E000.rubydb";
 
     // Save ativo = manual/0 (mais recente): Asa=1, Espada=0, KOROK=3.
     put32(b, 0x0C + 8 * 5000, crc32_ieee("IsGet_Paraglider"));
@@ -149,7 +152,7 @@ int main() {
     exec(db, "DELETE FROM user_achievements WHERE achievement_id LIKE '%glider'");
     achieve_check(db, closed, 250); achieve_commit();
     check("save e definições iguais: não reavalia", !has(db, "L:01007EF00011E000:glider"));
-    d = fopen(defs_path, "ab");
+    d = fopen(pack_path, "ab");  // muda o tamanho do pacote (o SQLite ignora o byte a mais)
     fputs(" ", d);
     fclose(d);
     achieve_check(db, closed, 280); achieve_commit();

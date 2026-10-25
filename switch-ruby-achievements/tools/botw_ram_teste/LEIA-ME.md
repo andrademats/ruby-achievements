@@ -1,11 +1,14 @@
 # Teste de conquistas por RAM no BOTW (v1114112)
 
-`01007EF00011E000.json` = 58 conquistas lidas só da memória com o jogo aberto, mais a Ruby
-(desbloqueada sozinha quando as 58 estiverem desbloqueadas)
-(`ram_flag_search`, IDs `rt_...`), sem conquistas de save nem de tempo de jogo.
-Ele substitui o arquivo de mesmo nome em `/switch/ruby_achievements/achievements/` no
-SD. Enquanto ele estiver lá, as conquistas de save e de tempo do pacote normal
-não são avaliadas. Para voltar, copie de novo o arquivo de `dist/`.
+`01007EF00011E000.aventureiro.rubydb` = 54 conquistas lidas só da memória com o jogo aberto,
+mais a Ruby (desbloqueada sozinha quando as outras estiverem desbloqueadas)
+(`ram_flag_search`, IDs `rt_...`), sem conquistas de save nem de tempo de jogo. É a
+conversão de `01007EF00011E000.aventureiro.json` (a fonte editável) por
+`tools/json_to_rubydb.py`; refazer depois de editar o JSON.
+
+Copie o `.rubydb` para `/switch/ruby_achievements/achievements/` no SD. Ele é uma
+variante: aparece ao lado do pacote normal na tela de conquistas do jogo no app, que
+escolhe o ativo (trocar apaga o progresso do pacote anterior).
 
 As 115 flags usadas foram conferidas no decomp (`gdt.cpp`): o nome existe e o
 tipo (bool, s32 ou f32) é o da cadeia usada. Cobrem runas, asa-delta, câmera,
@@ -15,8 +18,8 @@ coração), stamina (`StaminaMax`, f32, 1000 por roda), Guardiões, Hinox, Talus
 Molduga, Lynel, sementes Korok, pratos, baús de santuário, armaduras e o fim
 do jogo.
 
-O arquivo é compacto (uma conquista por linha) porque o sysmodule lê no
-máximo 64 KB por jogo. Por isso pratos, baús e armaduras usam só parte das
+O texto das conquistas fica abaixo de 64 KB, o limite do sysmodule por pacote.
+Por isso pratos, baús e armaduras usam só parte das
 flags (15 pratos, 15 santuários, 4 conjuntos). O jogo não tem contador total
 de refeições, baús ou guardiões: as conquistas contam flags diferentes, e os
 guardiões contam por tipo.

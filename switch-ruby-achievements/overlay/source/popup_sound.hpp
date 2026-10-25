@@ -1,6 +1,7 @@
 #pragma once
 // Som do pop-up de conquista (o escolhido no app ou PT_POPUP_SFX_PATH; regras em pt_wav.hpp):
-// WAV PCM 16 bits 48 kHz lido do SD aos pedaços por uma thread e tocado pelo audout. Falha em qualquer etapa = pop-up mudo.
+// WAV PCM 16 bits 48 kHz carregado na memória por uma thread antes de tocar (sem leituras do SD
+// durante o som) e tocado pelo audout. Falha em qualquer etapa = pop-up mudo.
 #include <switch.h>
 
 namespace sound {

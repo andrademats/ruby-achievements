@@ -1,4 +1,5 @@
 #include "pt_config.h"
+#include "pt_pack.h"
 #include "pt_paths.h"
 #include "ra_sync.hpp"
 #include "ui.hpp"
@@ -26,11 +27,20 @@ brls::Box* achievement_row(const AchievementRow& a) {
     row->setAlignItems(brls::AlignItems::CENTER);
     row->setBackgroundColor(open ? tico::kRowOpen : tico::kRowLocked);
 
-    if (!a.icon.empty()) {
+    // Ícone de pacote .rubydb: o PNG sai do BLOB direto para a textura (o NanoVG decodifica
+    // com stbi_load_from_memory). Bloqueada: o icon_locked do pacote, senão o desbloqueado
+    // apagado. Outros (RetroAchievements): arquivo no SD.
+    std::string pack, aid, png;
+    bool from_pack = pt_pack_parse_icon_ref(a.icon, pack, aid);
+    bool locked_art = from_pack && !open && pt_pack_read_icon(pack, aid, true, png);
+    if (from_pack && !locked_art) pt_pack_read_icon(pack, aid, false, png);
+    if (from_pack ? !png.empty() : !a.icon.empty()) {
         auto img = new brls::Image();
         img->setSize(brls::Size(64, 64));
         img->setScalingType(brls::ImageScalingType::FIT);
-        img->setImageFromFile(a.icon);
+        if (from_pack) img->setImageFromMem((const unsigned char*)png.data(), (int)png.size());
+        else img->setImageFromFile(a.icon);
+        if (from_pack && !open && !locked_art) img->setAlpha(0.35f);
         img->setMarginRight(16);
         row->addView(img);
     } else {
@@ -109,27 +119,47 @@ void choose_pack(int64_t game_id, const std::string& name) {
     }
     ui::pick(tr("Pacote de conquistas ativo"), labels, [game_id, name, packs, current](int i) {
         if (i == current) return;
-        AchievementPack chosen = packs[i];
-        ui::confirm(trf("Ativar o pacote \"%s\"?\n\nTodo o progresso de conquistas deste jogo (todos os perfis) "
-                        "será apagado. O pacote atual continua no cartão SD; se for ativado de novo, começa do zero.",
-                        chosen.label.c_str()),
-                    tr("Ativar"), [game_id, name, chosen] {
-                        if (!ui::report(data::set_active_pack(game_id, chosen.file),
-                                        trf("Pacote \"%s\" ativo", chosen.label.c_str())))
-                            return;
-                        AchievementsTab::request_refresh();
-                        HomeActivity::request_refresh();
-                        // Recria a tela com o pacote novo (sem reaproveitar views com foco).
-                        brls::Application::popActivity(brls::TransitionAnimation::FADE, [game_id, name] {
-                            brls::sync([game_id, name] {
-                                brls::Application::pushActivity(new AchievementListActivity(game_id, name));
-                            });
-                        });
-                    });
+        ui::activate_pack(game_id, packs[i], [game_id, name] {
+            // Recria a tela com o pacote novo (sem reaproveitar views com foco).
+            brls::Application::popActivity(brls::TransitionAnimation::FADE, [game_id, name] {
+                brls::sync([game_id, name] {
+                    brls::Application::pushActivity(new AchievementListActivity(game_id, name));
+                });
+            });
+        });
     }, current);
 }
 
 }  // namespace
+
+void ui::activate_pack(int64_t game_id, const AchievementPack& pack, std::function<void()> done) {
+    ui::confirm(trf("Ativar o pacote \"%s\"?\n\nTodo o progresso de conquistas deste jogo (todos os perfis) "
+                    "será apagado. O pacote atual continua no cartão SD; se for ativado de novo, começa do zero.",
+                    pack.label.c_str()),
+                tr("Ativar"), [game_id, pack, done] {
+                    if (!ui::report(data::set_active_pack(game_id, pack.file),
+                                    trf("Pacote \"%s\" ativo", pack.label.c_str())))
+                        return;
+                    AchievementsTab::request_refresh();
+                    HomeActivity::request_refresh();
+                    done();
+                });
+}
+
+brls::DetailCell* ui::community_cell(int64_t game_id, const std::string& name) {
+    std::string key = data::achievement_pack_key(game_id);
+    if (key.empty()) return nullptr;
+    bool has_pack = !pt_pack_files(key).empty();
+    auto cell = new brls::DetailCell();
+    cell->setText(has_pack ? tr("Gerenciar / baixar outros pacotes") : tr("Buscar pacotes da comunidade"));
+    cell->setDetailText(has_pack ? tr("Ativar, apagar ou baixar do catálogo") : tr("Catálogo no GitHub"));
+    if (!has_pack) cell->setDetailTextColor(nvgRGB(0, 190, 120));
+    cell->registerClickAction([game_id, name](brls::View*) {
+        brls::Application::pushActivity(new CommunityActivity(game_id, name));
+        return true;
+    });
+    return cell;
+}
 
 // --- Aba: jogos com conquistas ------------------------------------------------------
 AchievementsTab* AchievementsTab::s_current = nullptr;
@@ -188,9 +218,9 @@ void AchievementsTab::rebuild() {
 
     if (games.empty()) {
         m_list->addView(tico::card_text(
-            trf("Nenhum jogo com conquistas ainda. Sincronize o RetroAchievements (ROMs) ou crie as "
-                "definições em %s/<Title ID>.json (jogos do Switch) ou <nome da ROM>.json "
-                "(sem a extensão): o sysmodule avalia enquanto você joga.",
+            trf("Nenhum jogo com conquistas ainda. Sincronize o RetroAchievements (ROMs) ou copie "
+                "pacotes de conquistas para %s/<Title ID>.rubydb (jogos do Switch) ou <nome da ROM>.rubydb "
+                "(o nome sem a extensão): o sysmodule avalia enquanto você joga.",
                 PT_ACH_DIR)));
         return;
     }
@@ -328,6 +358,10 @@ brls::View* AchievementListActivity::createContentView() {
             return true;
         });
         root->addView(pack);
+    }
+    if (auto community = ui::community_cell(m_game_id, m_name)) {
+        community->setMarginBottom(8);
+        root->addView(community);
     }
 
     auto scroll = tico::scroller();

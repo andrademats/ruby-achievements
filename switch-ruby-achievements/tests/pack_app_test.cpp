@@ -1,4 +1,4 @@
-// Pacotes de conquistas no app (data.cpp + common/ach): reconhecimento pelo Title ID
+// Pacotes .rubydb no app (data.cpp + common/ach): reconhecimento pelo Title ID
 // sem abrir o jogo, lista de pacotes, troca do ativo com reset e volta do zero.
 #include <switch.h>
 #include "pdm_shim2.h"
@@ -10,6 +10,7 @@
 #include "pt_status.h"
 #include "pt_title.h"
 #include "pt_util.h"
+#include "rubydb_writer.hpp"
 
 s64 g_fake_now = 2000000;
 std::vector<PdmPlayEvent> g_events;
@@ -54,8 +55,14 @@ static void exec(const char* sql) {
     if (sqlite3_exec(db, sql, 0, 0, &err) != SQLITE_OK) printf("SQL: %s\n", err);
     pt_db_close(db);
 }
+// Pacote .rubydb a partir do JSON; texto que não é JSON vai cru (arquivo inválido).
 static void put(const char* name, const char* body) {
     std::string p = std::string(PT_ACH_DIR) + "/" + name;
+    JVal probe;
+    if (json_parse(body, strlen(body), probe)) {
+        rubydb::write(p, body);
+        return;
+    }
     FILE* f = fopen(p.c_str(), "wb");
     fputs(body, f);
     fclose(f);
@@ -76,19 +83,19 @@ int main() {
     for (const char* d : {"sdmc:", "sdmc:/switch", PT_DIR, PT_ACH_DIR}) mkdir(d, 0777);
     const u64 A = 0x0100AAAA00000000ULL, B = 0x0100BBBB00000000ULL, C = 0x0100CCCC00000000ULL;
     const u64 E = 0x0100EEEE00000000ULL;
-    g_installed = {A, B, E};  // C não está instalado; D já tem histórico (desinstalado); E com JSON inválido
-    put("0100AAAA00000000.json",
+    g_installed = {A, B, E};  // C não está instalado; D já tem histórico (desinstalado); E com pacote inválido
+    put("0100AAAA00000000.rubydb",
         "{\"game_name\":\"A\",\"achievements\":[{\"id\":\"a\",\"title\":\"A1\",\"rarity\":\"gold\",\"type\":\"playtime_stat\","
         "\"target_seconds\":60},{\"id\":\"b\",\"title\":\"A2\",\"type\":\"playtime_stat\",\"target_seconds\":90},"
         "{\"id\":\"platina\",\"title\":\"Plat\",\"rarity\":\"ruby\"}]}");
-    put("0100AAAA00000000.speedrun.json",
+    put("0100AAAA00000000.speedrun.rubydb",
         "{\"pack_name\":\"Speedrun\",\"achievements\":[{\"id\":\"x\",\"title\":\"Rápido\",\"type\":\"playtime_stat\","
         "\"target_seconds\":30},{\"id\":\"platina\",\"title\":\"Plat S\",\"rarity\":\"ruby\"}]}");
-    put("0100bbbb00000000.json", "{\"achievements\":[{\"id\":\"k\",\"title\":\"K\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
-    put("0100CCCC00000000.json", "{\"achievements\":[{\"id\":\"c\",\"title\":\"C\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
-    put("0100DDDD00000000.json", "{\"achievements\":[{\"id\":\"d\",\"title\":\"D\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
-    put("0100EEEE00000000.json", "{isto não é json");
-    put("JogoROM.json", "{\"achievements\":[{\"id\":\"r\",\"title\":\"R\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
+    put("0100bbbb00000000.rubydb", "{\"achievements\":[{\"id\":\"k\",\"title\":\"K\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
+    put("0100CCCC00000000.rubydb", "{\"achievements\":[{\"id\":\"c\",\"title\":\"C\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
+    put("0100DDDD00000000.rubydb", "{\"achievements\":[{\"id\":\"d\",\"title\":\"D\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
+    put("0100EEEE00000000.rubydb", "{isto não é json");
+    put("JogoROM.rubydb", "{\"achievements\":[{\"id\":\"r\",\"title\":\"R\",\"type\":\"playtime_stat\",\"target_seconds\":1}]}");
 
     // Banco com dois perfis e o D (jogado antes, hoje desinstalado).
     { sqlite3* db = pt_db_open(300); pt_db_close(db); }
@@ -101,10 +108,10 @@ int main() {
           keys.size() == 5 && keys[0] == "0100AAAA00000000" && keys[1] == "0100BBBB00000000");
     auto files = pt_pack_files("0100AAAA00000000");
     check("A: principal primeiro, depois a variante",
-          files.size() == 2 && files[0] == "0100AAAA00000000.json" && files[1] == "0100AAAA00000000.speedrun.json");
-    check("A: ativo padrão = principal", pt_pack_active("0100AAAA00000000") == "0100AAAA00000000.json");
-    check("B: arquivo com o Title ID em minúsculas", pt_pack_active("0100BBBB00000000") == "0100bbbb00000000.json");
-    check("ROM: sem variantes", pt_pack_files("JogoROM") == std::vector<std::string>{"JogoROM.json"});
+          files.size() == 2 && files[0] == "0100AAAA00000000.rubydb" && files[1] == "0100AAAA00000000.speedrun.rubydb");
+    check("A: ativo padrão = principal", pt_pack_active("0100AAAA00000000") == "0100AAAA00000000.rubydb");
+    check("B: arquivo com o Title ID em minúsculas", pt_pack_active("0100BBBB00000000") == "0100bbbb00000000.rubydb");
+    check("ROM: sem variantes", pt_pack_files("JogoROM") == std::vector<std::string>{"JogoROM.rubydb"});
 
     // --- reconhecimento sem abrir o jogo
     check("sincronização dos pacotes", data::sync_achievement_packs());
@@ -133,8 +140,8 @@ int main() {
     // --- lista de pacotes
     std::vector<AchievementPack> packs;
     data::achievement_packs(ga, packs);
-    check("A: 2 pacotes, principal ativo, \"Speedrun\" pelo pack_name",
-          packs.size() == 2 && packs[0].active && packs[0].label == tr("principal") && packs[0].count == 3 &&
+    check("A: 2 pacotes, principal ativo, títulos do pack_info (\"A\" e \"Speedrun\")",
+          packs.size() == 2 && packs[0].active && packs[0].label == "A" && packs[0].count == 3 &&
               packs[1].label == "Speedrun" && !packs[1].active);
     data::achievement_packs(gb, packs);
     check("B: 1 pacote", packs.size() == 1);
@@ -143,7 +150,7 @@ int main() {
     exec("INSERT INTO user_achievements VALUES('L:0100AAAA00000000:a',1,100),('L:0100AAAA00000000:a',2,110),"
          "('L:0100AAAA00000000:b',1,120),('L:0100DDDD00000000:d',1,130);"
          "INSERT INTO achievement_queue(achievement_id,user_id,created_at) VALUES('L:0100AAAA00000000:b',1,120);");
-    check("troca para o Speedrun", data::set_active_pack(ga, "0100AAAA00000000.speedrun.json"));
+    check("troca para o Speedrun", data::set_active_pack(ga, "0100AAAA00000000.speedrun.rubydb"));
     check("desbloqueios do A apagados (todos os perfis)",
           q("SELECT COUNT(*) FROM user_achievements WHERE achievement_id LIKE 'L:0100AAAA00000000:%'") == 0);
     check("fila de pop-ups do A apagada", q("SELECT COUNT(*) FROM achievement_queue") == 0);
@@ -151,23 +158,40 @@ int main() {
     check("galeria já mostra o Speedrun (2 conquistas, 0%)",
           q("SELECT COUNT(*) FROM achievements WHERE game_id=?", ga) == 2 &&
               q("SELECT COUNT(*) FROM achievements WHERE title='Rápido'") == 1);
-    check("escolha gravada para o sysmodule", pt_pack_active("0100AAAA00000000") == "0100AAAA00000000.speedrun.json");
+    check("escolha gravada para o sysmodule", pt_pack_active("0100AAAA00000000") == "0100AAAA00000000.speedrun.rubydb");
     check("pacote antigo continua no SD", pt_pack_files("0100AAAA00000000").size() == 2);
     data::achievement_packs(ga, packs);
     check("lista marca o Speedrun como ativo", packs.size() == 2 && packs[1].active && !packs[0].active);
 
     exec("INSERT INTO user_achievements VALUES('L:0100AAAA00000000:x',1,200);");
-    check("volta ao principal", data::set_active_pack(ga, "0100AAAA00000000.json"));
+    check("volta ao principal", data::set_active_pack(ga, "0100AAAA00000000.rubydb"));
     data::achievements(ga, 1, rows);
     int unlocked = 0;
     for (auto& r : rows) unlocked += r.unlocked_at > 0;
     check("principal recomeça do zero (3 conquistas, nenhuma desbloqueada)", rows.size() == 3 && unlocked == 0);
     check("progresso do Speedrun também apagado",
           q("SELECT COUNT(*) FROM user_achievements WHERE achievement_id LIKE 'L:0100AAAA00000000:%'") == 0);
-    check("arquivo inexistente recusado", !data::set_active_pack(ga, "0100AAAA00000000.nada.json"));
+    check("arquivo inexistente recusado", !data::set_active_pack(ga, "0100AAAA00000000.nada.rubydb"));
     check("nova sincronização não duplica", data::sync_achievement_packs() &&
                                                  q("SELECT COUNT(*) FROM achievements WHERE game_id=?", ga) == 3 &&
                                                  q("SELECT COUNT(*) FROM games WHERE title_id='0100AAAA00000000'") == 1);
+
+    // --- exclusão (pacotes da comunidade): o progresso fica no banco
+    exec("INSERT INTO user_achievements VALUES('L:0100AAAA00000000:a',1,300);");
+    check("apagar o ativo com outro no SD: recusado (ativar outro antes)",
+          !data::delete_achievement_pack(ga, "0100AAAA00000000.rubydb") && pt_pack_files("0100AAAA00000000").size() == 2);
+    check("apagar arquivo de outro jogo: recusado", !data::delete_achievement_pack(ga, "0100bbbb00000000.rubydb"));
+    check("apagar a variante inativa", data::delete_achievement_pack(ga, "0100AAAA00000000.speedrun.rubydb") &&
+                                           pt_pack_files("0100AAAA00000000").size() == 1);
+    check("apagar o único pacote (ativo)", data::delete_achievement_pack(ga, "0100AAAA00000000.rubydb") &&
+                                               pt_pack_files("0100AAAA00000000").empty());
+    check("progresso e conquistas continuam no banco",
+          q("SELECT COUNT(*) FROM user_achievements WHERE achievement_id='L:0100AAAA00000000:a'") == 1 &&
+              q("SELECT COUNT(*) FROM achievements WHERE game_id=?", ga) == 3);
+    check("chave de pacote do jogo do Switch", data::achievement_pack_key(ga) == "0100AAAA00000000");
+    exec("INSERT INTO title_builds VALUES('0100AAAA00000000','2E819F30C4110A5B00',5);");
+    check("build id gravado pelo sysmodule (Title ID em minúsculas na consulta)",
+          data::title_build_id("0100aaaa00000000") == "2E819F30C4110A5B00" && data::title_build_id("0100BBBB00000000").empty());
 
     printf("%s (%d falhas)\n", fails ? "FALHOU" : "TUDO OK", fails);
     return fails;

@@ -7,34 +7,27 @@
 #include "pt_db.h"
 
 // Conquistas locais: o pacote ativo da chave em PT_ACH_DIR (ver common/ach/pt_pack.h:
-// <chave>.json ou <chave>.<variante>.json), onde a chave é o Title ID (jogo nativo) ou o
-// nome do arquivo da ROM sem a extensão.
+// <chave>.rubydb ou <chave>.<variante>.rubydb, SQLite com o esquema de rubydb_schema.sql),
+// onde a chave é o Title ID (jogo nativo) ou o nome do arquivo da ROM sem a extensão.
 //
-// {
-//   "game_name": "...",
-//   "title_id": "01007EF00011E000",       // opcional, informativo
-//   "build_id": "CD57B23FA4BBAD65...",     // opcional: trava de versão das condições de RAM
-//   "achievements": [
-//     {"id": "10h", "title": "...", "description": "...",
-//      "type": "playtime_stat", "target_seconds": 36000},
-//     {"id": "glider", "title": "...", "type": "save_binary_offset",
-//      "save_file": "option.sav", "offset_hex": "0x12", "expected_value_hex": "0x01",
-//      "op": "==" | ">=" | "bit_check", "size": 1},
-//     {"id": "flag", "title": "...", "type": "save_flag_search", "save_file": "0/game_data.sav",
-//      "flag_name": "IsGet_Paraglider", "offset_after_flag": 4, "size": 1,
-//      "operator": "==", "expected_value_int": 1},
-//     {"id": "glider", "title": "...", "type": "save_flag_hash_search", "save_file": "0/game_data.sav",
-//      "flag_name": "IsGet_Paraglider", "hash_type": "crc32", "expected_value_int": 1},
-//     {"id": "lvl", "title": "...", "type": "save_json_key", "save_file": "/switch/jogo/save.json",
-//      "key_path": "player.stats.level", "operator": ">=", "expected_value_int": 20}
-//   ]
-// }
+// pt_pack_load monta a árvore avaliada aqui: pack_info.supported_build_ids vira "build_id"
+// e cada linha de achievements vira um objeto com id, title, description, rarity, secret,
+// "icon" (referência ao PNG dentro do pacote) e os campos de condition_json, que
+// é o objeto da condição (type e parâmetros) descrito abaixo:
 //
-// "build_id" (hex, prefixo do build id do executável principal): as condições
-// ram_flag_search só são avaliadas quando o jogo aberto tem esse build id;
+//   {"type": "playtime_stat", "target_seconds": 36000}
+//   {"type": "save_binary_offset", "save_file": "option.sav", "offset_hex": "0x12",
+//    "expected_value_hex": "0x01", "op": "==" | ">=" | "bit_check", "size": 1}
+//   {"type": "save_flag_search", "save_file": "0/game_data.sav", "flag_name": "IsGet_Paraglider",
+//    "offset_after_flag": 4, "size": 1, "operator": "==", "expected_value_int": 1}
+//   {"type": "save_flag_hash_search", "save_file": "0/game_data.sav",
+//    "flag_name": "IsGet_Paraglider", "hash_type": "crc32", "expected_value_int": 1}
+//   {"type": "save_json_key", "save_file": "/switch/jogo/save.json",
+//    "key_path": "player.stats.level", "operator": ">=", "expected_value_int": 20}
+//
+// "build_id" (prefixos hex do build id do executável principal, separados por vírgula):
+// as condições de RAM só são avaliadas quando o jogo aberto começa com um deles;
 // noutra versão ficam bloqueadas (uma linha no log). Save e tempo não mudam.
-// "icon" numa conquista: PNG relativo a PT_ACH_DIR ("icons/<tid>/<id>.png"),
-// mostrado na galeria e no pop-up. "category" e outros campos extras são ignorados.
 // "rarity": "bronze" (padrão), "silver", "gold" ou "ruby". A Ruby (platina) é
 // uma só por pacote e não tem condição: desbloqueia sozinha, logo depois da última
 // das outras, na mesma avaliação (o pop-up dela vem por último). Condição escrita
@@ -119,8 +112,9 @@ bool achieve_packs_changed(void);
 void achieve_discard(void);
 
 // Apaga da fila o que o overlay já mostrou (PT_POPUP_SEEN_PATH) e exporta o
-// restante em PT_POPUP_PATH, uma por linha: "id|raridade|ícone|título" (ícone =
-// caminho do PNG no SD ou vazio; título por último, pode ter qualquer texto).
+// restante em PT_POPUP_PATH, uma por linha: "id|raridade|ícone|título" (ícone = PNG
+// tirado do pacote para PT_POPUP_CACHE_DIR, ou vazio; título por último, pode ter qualquer
+// texto). O que sai da fila sai de PT_POPUP_CACHE_DIR. O som é sempre o escolhido no app.
 void achieve_export_popups(sqlite3* db);
 
 // Caminho, dentro do save montado em `fs`, do arquivo `target` mais recente

@@ -27,12 +27,18 @@
 // Jogo sob o cursor na Home: Title ID em hex (uma linha), gravado pelo patch da
 // QLaunch (ver qlaunch_patch/). Arquivo ausente ou 0 = nenhum jogo em destaque.
 #define PT_FOCUS_PATH   PT_DIR "/qlaunch_focus.txt"
-#define PT_ACH_DIR      PT_DIR "/achievements"     // pacotes <TID>.json, <TID>.<variante>.json, <rom>.json
+#define PT_ACH_DIR      PT_DIR "/achievements"     // pacotes <TID>.rubydb, <TID>.<variante>.rubydb, <rom>.rubydb
+// (os pacotes da comunidade entram como variante: <TID>.<pack_id>.rubydb)
 #define PT_ACH_ICONS_DIR PT_ACH_DIR "/icons"       // ícones baixados (RetroAchievements)
 // Pacote ativo de cada jogo, escolhido no app: "<chave>|<arquivo>" por linha (ver pt_pack.h).
 #define PT_ACH_ACTIVE_PATH PT_ACH_DIR "/active_packs.txt"
 #define PT_ACH_CACHE_DIR PT_DIR "/cache"           // cópias espelho de saves do console (conquistas)
+// Catálogo de pacotes da comunidade (app/community.hpp): cópia do último index.json baixado.
+#define PT_COMMUNITY_INDEX_PATH PT_ACH_CACHE_DIR "/index.json"
 #define PT_POPUP_PATH   PT_DIR "/achievement_popup.txt"  // sysmodule -> overlay: "id|raridade|ícone|título"
+// Ícones dos pop-ups tirados dos pacotes .rubydb pelo sysmodule (o overlay não tem
+// SQLite): q<id da fila>.png; apagados quando saem da fila.
+#define PT_POPUP_CACHE_DIR PT_ACH_CACHE_DIR "/popup"
 // Linhas no máximo em PT_POPUP_PATH (as mais antigas da fila). Precisa passar do limite
 // da proteção contra flood do overlay (popup::kFloodLimit), para ele ver a fila longa.
 #define PT_POPUP_QUEUE_MAX 16

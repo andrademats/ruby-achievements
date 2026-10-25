@@ -33,5 +33,9 @@ void detect_init(void);
 // PT_ICONS_DIR/<TID>.jpg (icon_path recebe o caminho, ou "" se falhar).
 bool detect_title_info(u64 tid, char* name, size_t name_cap, char* icon_path, size_t icon_cap);
 
+// Build id do executável principal do aplicativo em execução (64 dígitos hex maiúsculos),
+// pelo ldr:dmnt, sem ligar o dmnt ao jogo. false = nenhum aplicativo ou o loader não respondeu.
+bool detect_build_id(char out[65]);
+
 // Usuário atual: accountGetLastOpenedUser, depois accountGetPreselectedUser.
 bool detect_current_account(AccountUid* uid);

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "community.hpp"
 #include "data.hpp"
 #include "i18n.hpp"
 #include "sort.hpp"
@@ -47,6 +48,12 @@ void reassign_game(const GameRow& g, std::function<void()> changed);
 void open_sessions(const GameRow& g);
 // Desativa o tracking de tempo do jogo (com confirmação); `changed` roda depois.
 void disable_tracking(const GameRow& g, std::function<void()> changed);
+// Ativa outro pacote de conquistas do jogo, depois de confirmar que o progresso do jogo
+// (todos os perfis) será apagado (data::set_active_pack); `done` roda depois da troca.
+void activate_pack(int64_t game_id, const AchievementPack& pack, std::function<void()> done);
+// Célula que abre a CommunityActivity de um jogo do Switch ("Buscar pacotes da comunidade"
+// sem pacote no SD; "Gerenciar / baixar outros pacotes" com pacote). nullptr = jogo sem Title ID.
+brls::DetailCell* community_cell(int64_t game_id, const std::string& name);
 // Troca de tema ou idioma: reaplica as cores, fecha as telas abertas, recria a
 // tela inicial no lugar e reabre as Configurações globais na aba `settings_tab`
 // (-1 = não reabre). As views copiam cores e textos ao serem criadas.
@@ -175,6 +182,35 @@ public:
 private:
     int64_t m_game_id;
     std::string m_name;
+};
+
+// Pacotes de conquistas de um jogo do Switch (community_ui.cpp): os do cartão SD (ativar,
+// apagar) e os do catálogo da comunidade (community.hpp) com o selo de compatibilidade
+// (baixar, atualizar). A rede roda fora do thread da UI; B fica bloqueado durante a tarefa.
+class CommunityActivity : public brls::Activity {
+public:
+    CommunityActivity(int64_t game_id, std::string name);
+    ~CommunityActivity() override;
+    brls::View* createContentView() override;
+    void onContentAvailable() override;
+
+private:
+    void load(bool fetch_index);
+    void show();
+    void local_actions(const AchievementPack& p);
+    void entry_actions(size_t index);
+    void download(const community::Entry& e);
+    void changed();
+
+    std::shared_ptr<bool> m_alive;
+    bool m_running = false;
+    int64_t m_game_id;
+    std::string m_name;
+    std::shared_ptr<struct CommunityState> m_state;
+    brls::DetailCell* m_summary = nullptr;
+    brls::View* m_spinner = nullptr;
+    brls::Label* m_status = nullptr;
+    brls::Box* m_list = nullptr;
 };
 
 // Usuário e chave da Web API do RetroAchievements (config.ini, seção [app]).

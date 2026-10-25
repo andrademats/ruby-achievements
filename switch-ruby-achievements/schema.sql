@@ -109,6 +109,14 @@ CREATE TABLE IF NOT EXISTS rom_hash_cache (
     md5_hash TEXT NOT NULL
 );
 
+-- Build id do executável principal de cada título (64 hex), gravado pelo sysmodule quando o
+-- jogo abre (ldr:dmnt). O app compara com supported_build_ids dos pacotes da comunidade.
+CREATE TABLE IF NOT EXISTS title_builds (
+    title_id TEXT PRIMARY KEY,  -- 16 hex maiúsculos
+    build_id TEXT NOT NULL,
+    seen_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_achievements_game ON achievements(game_id);
 CREATE INDEX IF NOT EXISTS idx_games_title_id ON games(title_id);
 CREATE INDEX IF NOT EXISTS idx_games_rom_path ON games(rom_path);

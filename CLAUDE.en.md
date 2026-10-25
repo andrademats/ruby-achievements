@@ -24,9 +24,14 @@ authoritative version.
 - **Keys and dumps:** never commit, copy into the project, embed in packages or ask for the content
   of `prod.keys`/`title.keys`, NSPs, NSZs or a game's `main`. AchieveSet Studio only receives the
   *path* to the user's own keys. Do not decrypt game content without the user's explicit permission.
-- **Pack limit:** the achievement JSON is at most **64 KB per game** (the sysmodule truncates and
-  ignores the whole file). Sysmodule heap: 1.5 MB; each condition costs ~1.5 KB during evaluation;
-  above ~300 conditions, cut down. Write compact JSON (one achievement per line).
+- **`.rubydb` packs:** the only format read on the console is the SQLite `.rubydb` (schema in
+  `switch-ruby-achievements/rubydb_schema.sql`; written by `tools/json_to_rubydb.py` and by Studio).
+  The achievement text (title, description and condition) is at most **64 KB per pack**
+  (above that the whole pack is refused). Sysmodule heap: 1.5 MB; each condition costs ~1.5 KB during
+  evaluation; above ~300 conditions, cut down. PNG icon up to 256 KB and 512×512. Packs have no category
+  and no sound: the pop-up sound is only the global one, picked in the app (`sfx/`, rules in `pt_wav.hpp`).
+  Community packs (`index.json` catalog, `app_nro/source/community.hpp`) are installed as the variant
+  `<TID>.<pack_id>.rubydb`; the catalog entry comes from `tools/rubydb_index.py`.
 - **gdt::Manager (BOTW):** the chain is `[[[[main+sInstance]+mFlagBuffer]+array+8]+0]`; from the
   first flag object on, the search is by the CRC32 hash of the name in a window of up to 4 MB; the
   value sits `offset_after_flag` bytes from the hash (bool `-1`, s32 `-4`, f32 `-4`). Per-build
@@ -34,8 +39,9 @@ authoritative version.
   `tools/find_botw_ram_offsets.py`.
 - **Generic pointers (`ram_pointer_chain`):** EdiZon/Cheat Engine notation `[[main+A]+B]+C`; every
   offset except the last is read as a pointer.
-- **Build ID lock:** every pack with a RAM condition carries `build_id` (and `title_id`). RAM offsets
-  only hold for the executable they were found in.
+- **Build ID lock:** every pack with a RAM condition carries `supported_build_ids` (and
+  `target_title_id`) in `pack_info`; in the source JSON, `build_id` and `title_id`. RAM offsets only
+  hold for the executable they were found in.
 - **Where it was tested:** always distinguish "tested on the console", "PC only" and "deduced". Do
   not claim something works on the console without a console log.
 

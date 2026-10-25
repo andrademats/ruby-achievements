@@ -56,7 +56,7 @@ struct AchievementRow {
     std::string id;
     std::string title;
     std::string description;
-    std::string icon;  // caminho local; "" = sem ícone
+    std::string icon;  // caminho local, referência a um .rubydb (pt_pack_icon_ref) ou "" = sem ícone
     bool secret = false;
     int64_t unlocked_at = 0;  // 0 = bloqueada
     std::string rarity = "bronze";  // bronze, silver, gold ou ruby (RetroAchievements: bronze)
@@ -65,7 +65,7 @@ struct AchievementRow {
 // Pacote de conquistas de um jogo no SD (ver common/ach/pt_pack.h).
 struct AchievementPack {
     std::string file;   // nome em PT_ACH_DIR
-    std::string label;  // "pack_name" do JSON, a variante do nome do arquivo ou "principal"
+    std::string label;  // título do pacote (pack_info), a variante do nome do arquivo ou "principal"
     int count = 0;      // conquistas no arquivo
     bool active = false;
 };
@@ -163,7 +163,7 @@ bool achievement_games(int64_t user_filter, std::vector<AchievementGameRow>& out
 // bloqueadas na ordem da definição.
 bool achievements(int64_t game_id, int64_t user_filter, std::vector<AchievementRow>& out);
 
-// Pacotes do SD para os jogos nativos: liga cada <TID>.json (ou variante) ao jogo do
+// Pacotes do SD para os jogos nativos: liga cada <TID>.rubydb (ou variante) ao jogo do
 // Title ID e grava os metadados do pacote ativo, sem precisar abrir o jogo. Jogo que
 // ainda não está no banco entra se estiver instalado (nome e ícone do NACP).
 bool sync_achievement_packs();
@@ -172,6 +172,15 @@ bool achievement_packs(int64_t game_id, std::vector<AchievementPack>& out);
 // Ativa outro pacote: apaga todo o progresso de conquistas do jogo (todos os perfis)
 // e carrega as conquistas do pacote novo, do zero. O antigo continua no SD.
 bool set_active_pack(int64_t game_id, const std::string& file);
+// Apaga um pacote do SD sem mexer no progresso nem no histórico do banco. O ativo só sai se
+// for o único do jogo (com outros no SD, o sysmodule passaria a outro sem zerar o progresso:
+// é preciso ativar outro antes, e a troca é que zera).
+bool delete_achievement_pack(int64_t game_id, const std::string& file);
+// Chave de pacote do jogo: Title ID em hex maiúsculo (jogos do Switch e forwarders); "" nos outros.
+std::string achievement_pack_key(int64_t game_id);
+// Build id do executável principal do título (64 hex), gravado pelo sysmodule quando o jogo
+// abre; "" = ainda não visto.
+std::string title_build_id(const std::string& title_id);
 
 // Cache de MD5 das ROMs (tabela rom_hash_cache), válido para o mesmo tamanho e data.
 bool rom_hash_lookup(const std::string& path, int64_t size, int64_t mtime, std::string& md5);

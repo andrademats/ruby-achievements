@@ -20,17 +20,23 @@
 - **Chaves e dumps:** nunca commitar, copiar para o projeto, embutir em pacotes ou pedir o conteúdo de
   `prod.keys`/`title.keys`, NSPs, NSZs ou o `main` de jogos. O AchieveSet Studio só recebe o *caminho*
   das chaves do próprio usuário. Não decriptar conteúdo de jogo sem autorização explícita do usuário.
-- **Limite do pacote:** o JSON de conquistas tem no máximo **64 KB por jogo** (o sysmodule corta e
-  ignora o arquivo inteiro). Heap do sysmodule: 1,5 MB; cada condição custa ~1,5 KB durante a
-  avaliação; acima de ~300 condições, reduzir. Gravar compacto (uma conquista por linha).
+- **Pacotes `.rubydb`:** o único formato lido no console é o SQLite `.rubydb` (esquema em
+  `switch-ruby-achievements/rubydb_schema.sql`; gravado por `tools/json_to_rubydb.py` e pelo Studio).
+  O texto das conquistas (título, descrição e condição) tem no máximo **64 KB por pacote**
+  (acima disso o pacote inteiro é recusado). Heap do sysmodule: 1,5 MB; cada condição custa ~1,5 KB
+  durante a avaliação; acima de ~300 condições, reduzir. Ícone PNG até 256 KB e 512×512. Pacotes não
+  têm categoria nem som: o som do pop-up é só o global, escolhido no app (`sfx/`, regras de `pt_wav.hpp`).
+  Pacotes da comunidade (catálogo `index.json`, `app_nro/source/community.hpp`) entram como variante
+  `<TID>.<pack_id>.rubydb`; a entrada do catálogo sai de `tools/rubydb_index.py`.
 - **gdt::Manager (BOTW):** a cadeia é `[[[[main+sInstance]+mFlagBuffer]+array+8]+0]`, e a partir do
   primeiro objeto de flag a busca é pelo hash CRC32 do nome numa janela de até 4 MB; o valor fica
   `offset_after_flag` bytes do hash (bool `-1`, s32 `-4`, f32 `-4`). Valores por build em
   `switch-ruby-achievements/tools/botw_ram_teste/LEIA-ME.md`; reanalisar com `tools/find_botw_ram_offsets.py`.
 - **Ponteiros genéricos (`ram_pointer_chain`):** notação EdiZon/Cheat Engine `[[main+A]+B]+C`; todos
   os offsets menos o último são lidos como ponteiro.
-- **Trava por build ID:** todo pacote com condição de RAM leva `build_id` (e `title_id`). Offsets de
-  RAM só valem no executável para o qual foram achados.
+- **Trava por build ID:** todo pacote com condição de RAM leva `supported_build_ids` (e
+  `target_title_id`) no `pack_info`; no JSON de origem, `build_id` e `title_id`. Offsets de RAM só
+  valem no executável para o qual foram achados.
 - **Testado onde:** distinguir sempre "testado no console", "só no PC" e "deduzido". Não afirmar
   que algo funciona no console sem log do console.
 

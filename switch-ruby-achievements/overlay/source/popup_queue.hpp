@@ -46,16 +46,12 @@ inline std::vector<Popup> parse_queue(char* buf, int64_t seen) {
             *bar = '\0';
             f[i] = bar + 1;
         }
-        if (!f[1]) continue;
         Popup p;
+        if (!f[3] || !parse_rarity(f[1], &p.rarity)) continue;  // linha fora do formato
         p.id = strtoll(f[0], NULL, 10);
         if (p.id <= seen) continue;
-        if (f[3] && parse_rarity(f[1], &p.rarity)) {
-            p.icon = f[2];
-            p.title = f[3];
-        } else {
-            p.title = f[1];  // sysmodule antigo: "id|título|descrição"
-        }
+        p.icon = f[2];
+        p.title = f[3];
         out.push_back(p);
     }
     return out;

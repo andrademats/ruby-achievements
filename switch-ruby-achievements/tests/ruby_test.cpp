@@ -1,8 +1,10 @@
 // Raridade e Ruby (platina): migração da coluna, desbloqueio automático depois da
-// última das outras, pop-up dela por último e formato "id|raridade|ícone|título".
+// última das outras, pop-up dela por último e formato "id|raridade|ícone|som|título"
+// (ícone e som tirados do .rubydb para o cache dos pop-ups).
 // Rodar duas vezes no mesmo diretório: "prep" (banco sem a coluna, como os antigos)
 // e depois sem argumento.
 #include "achieve.cpp"
+#include "rubydb_writer.hpp"
 s64 g_fake_now = 1000;
 int g_save_opens = 0;
 Result g_save_rc = 0;
@@ -27,17 +29,18 @@ static void flag_file(const char* path) {
     fwrite("FLAGxxxx\x01", 1, 9, f);
     fclose(f);
 }
-static void write_pack(const char* tid, const char* body) {
-    std::string p = std::string(PT_ACH_DIR) + "/" + tid + ".json";
-    FILE* f = fopen(p.c_str(), "wb");
-    fputs(body, f);
-    fclose(f);
+static const std::string kPng = std::string("\x89PNG\r\n\x1a\n", 8) + "icone A";
+static void write_pack(const char* tid, const char* body, bool media = false) {
+    std::string p = std::string(PT_ACH_DIR) + "/" + tid + ".rubydb";
+    bool ok = media ? rubydb::write(p, body, {{"a", kPng}}) : rubydb::write(p, body);
+    if (!ok) printf("write_pack(%s) falhou\n", tid);
 }
+static std::string slurp(const std::string& path) { return rubydb::slurp(path.c_str()); }
 #define COND(file) "\"type\":\"save_flag_search\",\"save_file\":\"" file "\",\"flag_name\":\"FLAG\",\"size\":1,\"expected_value_int\":1"
 
 int main(int argc, char** argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
-    for (const char* d : {"sdmc:", "sdmc:/switch", PT_DIR, PT_ACH_DIR, PT_DIR "/cache", "sdmc:/sv"}) mkdir(d, 0777);
+    for (const char* d : {"sdmc:", "sdmc:/switch", PT_DIR, PT_ACH_DIR, PT_DIR "/cache", PT_POPUP_CACHE_DIR, "sdmc:/sv"}) mkdir(d, 0777);
     if (argc > 1 && !strcmp(argv[1], "prep")) {
         sqlite3* db = pt_db_open(300);
         sqlite3_exec(db, "ALTER TABLE achievements DROP COLUMN rarity", 0, 0, 0);
@@ -59,11 +62,12 @@ int main(int argc, char** argv) {
     write_pack("0100000000000001",
                "{\"achievements\":[\n"
                "{\"id\":\"plat\",\"title\":\"Platina\",\"rarity\":\"ruby\"," COND("/sv/nunca.sav") "},\n"
-               "{\"id\":\"a\",\"title\":\"A\",\"icon\":\"icons/x/a.png\"," COND("/sv/a.sav") "},\n"
+               "{\"id\":\"a\",\"title\":\"A\"," COND("/sv/a.sav") "},\n"
                "{\"id\":\"b\",\"title\":\"B\",\"rarity\":\"silver\"," COND("/sv/b.sav") "},\n"
                "{\"id\":\"c\",\"title\":\"C | ouro\",\"rarity\":\"gold\"," COND("/sv/c.sav") "},\n"
                "{\"id\":\"plat2\",\"title\":\"Outra\",\"rarity\":\"ruby\"}\n"
-               "]}");
+               "]}",
+               true);
     AchieveTarget t{1, 1, 0x0100000000000001ULL, "", false};
     auto run = [&] {
         g_fake_now += 10;
@@ -100,10 +104,18 @@ int main(int argc, char** argv) {
     std::string text = buf;
     std::string last = text.substr(text.rfind('\n', text.size() - 2) + 1);
     check("pop-up da Ruby: \"id|ruby||Platina\"", last.find("|ruby||Platina\n") != std::string::npos);
-    check("pop-up com ícone: caminho no SD",
-          text.find("|bronze|" PT_ACH_DIR "/icons/x/a.png|A\n") != std::string::npos);
+    size_t at = text.find("|bronze|" PT_POPUP_CACHE_DIR "/q");
+    std::string icon = at == std::string::npos ? "" : text.substr(at + 8, text.find('|', at + 8) - at - 8);
+    check("pop-up com ícone: PNG tirado do pacote para o cache", !icon.empty() && slurp(icon) == kPng);
     check("pop-up: '|' do título vira espaço", text.find("|gold||C   ouro\n") != std::string::npos);
-    check("pop-up sem descrição (4 campos)", std::count(last.begin(), last.end(), '|') == 3);
+    check("pop-up sem descrição nem som (4 campos)", std::count(last.begin(), last.end(), '|') == 3);
+
+    // O overlay mostrou tudo: a fila esvazia e o cache dos pop-ups também.
+    char seen[32];
+    snprintf(seen, sizeof(seen), "%lld\n", (long long)q(db, "SELECT MAX(id) FROM achievement_queue"));
+    pt_write_file_atomic(PT_POPUP_SEEN_PATH, seen, strlen(seen));
+    achieve_export_popups(db);
+    check("fila vista: o ícone sai do cache", slurp(icon).empty());
 
     run();
     check("nova avaliação: nada repetido", q(db, "SELECT COUNT(*) FROM user_achievements") == 4);
@@ -130,7 +142,7 @@ int main(int argc, char** argv) {
     write_pack("0100000000000001.hard", "{\"achievements\":[{\"id\":\"h\",\"title\":\"H\"," COND("/sv/a.sav") "}]}");
     std::string err;
     check("troca para a variante (pt_pack_switch)",
-          pt_pack_switch(db, "0100000000000001", "0100000000000001.hard.json", &err));
+          pt_pack_switch(db, "0100000000000001", "0100000000000001.hard.rubydb", &err));
     check("progresso do principal apagado na troca", q(db, kOne) == 0);
     check("sysmodule percebe a troca (active_packs.txt)", achieve_packs_changed());
     check("e só uma vez", !achieve_packs_changed());
@@ -140,7 +152,7 @@ int main(int argc, char** argv) {
           q(db, kOne) == 1 && q(db, "SELECT COUNT(*) FROM user_achievements WHERE achievement_id LIKE '%:h'") == 1);
     check("lista do jogo só com a variante",
           q(db, "SELECT COUNT(*) FROM achievements WHERE id LIKE 'L:0100000000000001:%'") == 1);
-    check("volta ao principal", pt_pack_switch(db, "0100000000000001", "0100000000000001.json", &err));
+    check("volta ao principal", pt_pack_switch(db, "0100000000000001", "0100000000000001.rubydb", &err));
     run();
     check("principal do zero: saves iguais relidos, as 3 e a Ruby de novo", q(db, kOne) == 4);
 

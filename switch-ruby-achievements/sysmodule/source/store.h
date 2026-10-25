@@ -41,5 +41,8 @@ int64_t store_last_played_game(sqlite3* db);
 int64_t store_find_title(sqlite3* db, u64 tid);
 void store_game_name(sqlite3* db, int64_t game_id, char* out, size_t cap);
 
+// Grava o build id do título (tabela title_builds) se mudou. 0 = ok.
+int store_title_build(sqlite3* db, u64 tid, const char* build_id, int64_t now);
+
 // Exporta "id|apelido" de todos os usuários para o overlay.
 int store_export_users(sqlite3* db);

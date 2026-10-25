@@ -227,6 +227,22 @@ int64_t store_last_played_game(sqlite3* db) {
                         0, 0, 0);
 }
 
+int store_title_build(sqlite3* db, u64 tid, const char* build_id, int64_t now) {
+    char hex[17];
+    snprintf(hex, sizeof(hex), "%016lX", tid);
+    sqlite3_stmt* st = prep(db,
+                            "INSERT INTO title_builds (title_id, build_id, seen_at) VALUES (?1, ?2, ?3) "
+                            "ON CONFLICT(title_id) DO UPDATE SET build_id=excluded.build_id, seen_at=excluded.seen_at "
+                            "WHERE title_builds.build_id <> excluded.build_id");
+    if (!st) return -1;
+    sqlite3_bind_text(st, 1, hex, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, build_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 3, now);
+    int rc = sqlite3_step(st) == SQLITE_DONE ? 0 : -1;
+    sqlite3_finalize(st);
+    return rc;
+}
+
 int64_t store_find_title(sqlite3* db, u64 tid) {
     char hex[17];
     snprintf(hex, sizeof(hex), "%016lX", tid);

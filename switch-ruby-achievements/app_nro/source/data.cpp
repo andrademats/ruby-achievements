@@ -4,6 +4,7 @@
 #include <switch.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -1352,6 +1353,43 @@ bool set_active_pack(int64_t game_id, const std::string& file) {
     load_active_pack(d.db, key, game_id);
     sqlite3_exec(d.db, "COMMIT", nullptr, nullptr, nullptr);
     return true;
+}
+
+bool delete_achievement_pack(int64_t game_id, const std::string& file) {
+    Db d;  // com o lock: o sysmodule não está lendo o pacote
+    if (!d) return false;
+    std::string key = pack_key(d.db, game_id);
+    std::vector<std::string> files = pt_pack_files(key);
+    if (key.empty() || std::find(files.begin(), files.end(), file) == files.end()) {
+        g_error = tr("Pacote não encontrado no cartão SD.");
+        return false;
+    }
+    if (file == pt_pack_active(key) && files.size() > 1) {
+        g_error = tr("Este é o pacote ativo. Ative outro pacote antes de apagar este.");
+        return false;
+    }
+    std::string path = std::string(PT_ACH_DIR) + "/" + file;
+    if (unlink(path.c_str()) != 0) {
+        g_error = trf("Não foi possível apagar %s.", path.c_str());
+        return false;
+    }
+    return true;
+}
+
+std::string achievement_pack_key(int64_t game_id) {
+    Db d;
+    return d ? pack_key(d.db, game_id) : std::string();
+}
+
+std::string title_build_id(const std::string& title_id) {
+    Db d;
+    if (!d) return "";
+    Stmt s(d.db, "SELECT build_id FROM title_builds WHERE title_id=?");
+    if (!s) return "";
+    std::string key = title_id;
+    for (auto& c : key) c = (char)toupper((unsigned char)c);
+    s.text(1, key);
+    return s.row() ? s.col_str(0) : "";
 }
 
 bool rom_hash_lookup(const std::string& path, int64_t size, int64_t mtime, std::string& md5) {

@@ -4,8 +4,10 @@
 #include "detect.h"
 #include "tracker.h"
 #include "pt_db.h"
+#include "pt_log.h"
 #include "pt_util.h"
 #include "pt_paths.h"
+#include "rubydb_writer.hpp"
 s64 g_fake_now = 1000;
 int g_save_opens = 0;
 Result g_save_rc = 0;
@@ -19,6 +21,12 @@ bool detect_is_ghost(u64) { return false; }
 bool detect_home_in_front(u64) { return g_home_front; }
 u64 detect_focused_title(void) { return 0; }
 void detect_init(void) {}
+int g_build_reads = 0;
+bool detect_build_id(char out[65]) {
+    g_build_reads++;
+    snprintf(out, 65, "2E819F30C4110A5B%048d", 0);
+    return true;
+}
 bool detect_title_info(u64 tid, char* n, size_t c, char* i, size_t) {
     snprintf(n, c, "Jogo %llX", (unsigned long long)(tid & 0xFFFF));
     i[0] = 0;
@@ -92,6 +100,7 @@ int main() {
           "\"expected_value_int\":1}]}",
           d);
     fclose(d);
+    rubydb::from_json_file(PT_ACH_DIR "/01007EF00011E000.json");
     std::vector<char> save(4096, 0);
     put32(save, 0x0C, crc32_of("IsGet_PlayerStole2"));
     put32(save, 0x10, 1);
@@ -112,6 +121,9 @@ int main() {
     check("abertura (55 s): nenhuma varredura de saves de ROM", log_count("varredura de saves") == scans0);
     run(10);
     check("após 60 s: sessão gravada", q("SELECT COUNT(*) FROM sessions") == 1);
+    check("após 60 s: build id do jogo em title_builds (uma leitura)",
+          q("SELECT COUNT(*) FROM title_builds WHERE title_id='01007EF00011E000' AND "
+            "build_id LIKE '2E819F30C4110A5B%' AND length(build_id)=64") == 1 && g_build_reads == 1);
 
     // Save recusado com o jogo aberto: tenta uma vez e espera.
     run(120);
@@ -135,7 +147,7 @@ int main() {
     check("ao fechar: conquista do save desbloqueada", q("SELECT COUNT(*) FROM user_achievements") == 1);
     check("pop-up exportado", q("SELECT COUNT(*) FROM achievement_queue") == 1);
     {
-        // Formato para o overlay: "id|raridade|ícone|título" (sem pontos e sem descrição).
+        // Formato para o overlay: "id|raridade|ícone|título" (sem pontos, descrição nem som).
         char buf[512] = {0};
         pt_read_file(PT_POPUP_PATH, buf, sizeof(buf) - 1);
         std::string want = std::to_string(q("SELECT id FROM achievement_queue")) + "|bronze||Asa\n";
@@ -151,9 +163,25 @@ int main() {
     run(15);
     check("forwarder/homebrew: gravado após ~10 s", q("SELECT COUNT(*) FROM sessions") == 2);
     check("forwarder/homebrew: varredura de saves de ROM continua", log_count("varredura de saves") == scans0 + 1);
+    check("forwarder/homebrew: sem leitura de build id", g_build_reads == 1 && q("SELECT COUNT(*) FROM title_builds") == 1);
     g_tid = 0;
     run(3);
     check("journal PERSIST", q("PRAGMA journal_mode") != -1);
+
+    // Log do sysmodule: lote numa escrita só (avaliação) e rotação para .old.
+    pt_log_batch_begin();
+    pt_log("lote %d", 1);
+    pt_log("lote %d", 2);
+    check("log em lote: nada no SD antes do fim", log_count("lote ") == 0);
+    pt_log_batch_end();
+    check("log em lote: as linhas gravadas no fim", log_count("lote 1") == 1 && log_count("lote 2") == 1);
+    std::string filler(600, 'x');
+    for (int i = 0; i < 60; i++) pt_log("enchendo %s", filler.c_str());
+    pt_log("depois da rotacao");
+    struct stat old_st;
+    check("log acima de 32 KB vira .old (o histórico não some)",
+          stat(PT_LOG_PATH ".old", &old_st) == 0 && old_st.st_size > 32 * 1024 && log_count("lote ") == 0 &&
+              log_count("depois da rotacao") == 1);
     printf("%s (%d falhas)\n", fails ? "FALHOU" : "TUDO OK", fails);
     return fails;
 }

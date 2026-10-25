@@ -64,9 +64,6 @@ struct Release {
 bool parse_release(const std::string& json, Release& out, std::string& error);
 const Asset* find_asset(const Release& r, const std::string& name);
 
-// SHA-256 de um arquivo em hex minúsculo; "" se não leu.
-std::string sha256_file(const std::string& path);
-
 struct Check {
     Release release;
     Manifest manifest;

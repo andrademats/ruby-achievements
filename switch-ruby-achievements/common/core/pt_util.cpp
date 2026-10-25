@@ -135,6 +135,7 @@ void pt_ensure_dirs(void) {
     mkdir(PT_ACH_DIR, 0777);
     mkdir(PT_ACH_ICONS_DIR, 0777);
     mkdir(PT_ACH_CACHE_DIR, 0777);
+    mkdir(PT_POPUP_CACHE_DIR, 0777);
     pt_update_recover();  // atualização interrompida (queda de energia): volta a versão anterior
 }
 

@@ -61,6 +61,16 @@ brls::View* GameActivity::createContentView() {
     m_per_user->setMarginBottom(20);
     col->addView(m_per_user);
 
+    // Jogo do Switch: pacotes de conquistas (os do SD e os da comunidade).
+    GameRow row;
+    data::game(m_id, ui::profile_filter(), row);
+    if (auto community = ui::community_cell(m_id, row.name)) {
+        col->addView(tico::section(tr("Conquistas")));
+        auto ach = new tico::Panel();
+        ach->addView(community);
+        col->addView(ach);
+    }
+
     // Sessões e conquistas têm caminhos próprios (menu + e A na tela inicial).
     auto changed = [this] { refresh(); };
     col->addView(tico::section(tr("Preferências do jogo")));

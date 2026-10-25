@@ -1,5 +1,13 @@
 Modelo de conquista por memória (ram_flag_search). Este arquivo não é carregado:
-as conquistas vêm de <Title ID>.json (jogo do sistema) ou <nome da ROM>.json.
+as conquistas vêm de pacotes <Title ID>.rubydb (jogo do sistema) ou <nome da ROM>.rubydb,
+um banco SQLite por pacote com as conquistas e os ícones. O som do pop-up é o escolhido no
+app (pasta sfx/), igual para todos os pacotes.
+
+Para criar um pacote: use o AchieveSet Studio (exporta direto em .rubydb) ou escreva o JSON
+abaixo e converta no PC com
+    python tools/json_to_rubydb.py --input meu_jogo.json --output <Title ID>.rubydb
+(do repositório Ruby Achievements). Cada conquista do JSON vira uma linha do pacote; o
+"type" e os parâmetros dela ficam na coluna condition_json.
 
 Os valores abaixo são ilustrativos. Assinatura e offsets dependem do jogo e da
 versão: descubra os seus com EdiZon/Breeze ou um disassembler e confira no log
@@ -8,11 +16,13 @@ A assinatura precisa aparecer exatamente uma vez no módulo principal.
 
 {
   "game_name": "Meu jogo",
+  "title_id": "0100000000000000",
   "achievements": [
     {
       "id": "glider_ram",
       "title": "Planador (memória)",
       "description": "Desbloqueia com o jogo aberto.",
+      "icon": "icons/glider_ram.png",
       "type": "ram_flag_search",
       "signature": "AA BB CC DD ?? ?? EE FF 00 11 22 33",
       "pointer_offsets": ["0x10", "0x20"],

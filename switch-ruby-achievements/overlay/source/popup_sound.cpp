@@ -1,6 +1,7 @@
 #include "popup_sound.hpp"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <atomic>
@@ -30,17 +31,35 @@ bool g_request = false;  // protegido por g_mutex
 std::string g_path;
 u32 g_max_ms = 0;
 
+// Áudio do arquivo: inteiro na memória (lido antes de tocar) ou, sem memória para ele,
+// lido do SD aos pedaços durante o som. Ler aos pedaços disputava o cartão com o jogo e
+// com o sysmodule; um pedaço atrasado esvaziava a fila do audout e o som saía picotado.
+struct Source {
+    FILE* f = nullptr;
+    u8* mem = nullptr;
+    size_t size = 0, at = 0;
+
+    // Itens de `item` bytes lidos para `dst`.
+    size_t read(void* dst, size_t item, size_t count) {
+        if (!mem) return fread(dst, item, count, f);
+        size_t n = (size - at) / item < count ? (size - at) / item : count;
+        memcpy(dst, mem + at, n * item);
+        at += n * item;
+        return n;
+    }
+};
+
 // Enche um buffer com até kBufBytes de áudio estéreo; devolve os bytes escritos.
-size_t fill(FILE* f, const pt::Wav& w, u32& frames_left, u8* out) {
+size_t fill(Source& src, const pt::Wav& w, u32& frames_left, u8* out) {
     const u32 max_frames = (u32)(kBufBytes / 4);
     u32 frames = frames_left < max_frames ? frames_left : max_frames;
     if (!frames) return 0;
     size_t got;
     if (w.channels == 2) {
-        got = fread(out, 4, frames, f);
+        got = src.read(out, 4, frames);
     } else {  // mono: lê no fim do buffer e duplica para os dois canais
         s16* mono = (s16*)(out + kBufBytes) - frames;
-        got = fread(mono, 2, frames, f);
+        got = src.read(mono, 2, frames);
         s16* st = (s16*)out;
         for (size_t i = 0; i < got; i++) st[2 * i] = st[2 * i + 1] = mono[i];
     }
@@ -50,20 +69,37 @@ size_t fill(FILE* f, const pt::Wav& w, u32& frames_left, u8* out) {
 }
 
 void play_file(const std::string& path, u32 max_ms) {
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return;
+    Source src;
+    src.f = fopen(path.c_str(), "rb");
+    if (!src.f) return;
     pt::Wav w;
-    if (!pt::read_wav(f, w) || !w.playable()) {
-        fclose(f);
+    if (!pt::read_wav(src.f, w) || !w.playable()) {
+        fclose(src.f);
         return;
     }
-    fseek(f, w.data_offset, SEEK_SET);
+    fseek(src.f, w.data_offset, SEEK_SET);
     u32 frames_left = w.data_size / (w.channels * 2);
     u32 limit = max_ms * 48;  // o som acaba junto com o pop-up
     if (frames_left > limit) frames_left = limit;
 
+    src.size = (size_t)frames_left * w.channels * 2;
+    src.mem = (u8*)malloc(src.size);
+    if (src.mem) {
+        src.size = fread(src.mem, 1, src.size, src.f);
+        fclose(src.f);
+        src.f = nullptr;
+    } else {
+        static bool warned = false;
+        if (!warned) SLOG("som do pop-up: sem memoria para %zu KB; lendo do SD durante o som", src.size / 1024);
+        warned = true;
+    }
+    auto done = [&] {
+        if (src.f) fclose(src.f);
+        free(src.mem);
+    };
+
     if (R_FAILED(audoutStartAudioOut())) {
-        fclose(f);
+        done();
         return;
     }
     int queued = 0;
@@ -72,7 +108,7 @@ void play_file(const std::string& path, u32 max_ms) {
         g_out[i].buffer = g_mem[i];
         g_out[i].buffer_size = kBufBytes;
         g_out[i].data_offset = 0;
-        g_out[i].data_size = fill(f, w, frames_left, g_mem[i]);
+        g_out[i].data_size = fill(src, w, frames_left, g_mem[i]);
         if (!g_out[i].data_size) break;
         if (R_SUCCEEDED(audoutAppendAudioOutBuffer(&g_out[i]))) queued++;
     }
@@ -85,13 +121,13 @@ void play_file(const std::string& path, u32 max_ms) {
         }
         queued--;
         if (g_stop || g_quit) continue;
-        released->data_size = fill(f, w, frames_left, (u8*)released->buffer);
+        released->data_size = fill(src, w, frames_left, (u8*)released->buffer);
         if (released->data_size && R_SUCCEEDED(audoutAppendAudioOutBuffer(released))) queued++;
     }
     audoutStopAudioOut();
     bool flushed = false;
     audoutFlushAudioOutBuffers(&flushed);
-    fclose(f);
+    done();
 }
 
 void worker(void*) {
@@ -121,7 +157,8 @@ void init() {
         SLOG("som do pop-up desativado: audout rc=0x%X", rc);
         return;
     }
-    rc = threadCreate(&g_thread, worker, nullptr, nullptr, 0x4000, 0x2C, -2);
+    // Prioridade acima do laço de desenho (0x2C): o audout é reabastecido assim que pede.
+    rc = threadCreate(&g_thread, worker, nullptr, nullptr, 0x4000, 0x2B, -2);
     if (R_SUCCEEDED(rc)) rc = threadStart(&g_thread);
     if (R_FAILED(rc)) {
         SLOG("som do pop-up desativado: thread rc=0x%X", rc);

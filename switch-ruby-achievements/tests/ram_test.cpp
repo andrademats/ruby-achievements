@@ -1,5 +1,6 @@
 // ram_flag_search sobre memória simulada (assinatura, cadeia de ponteiros, hash).
 #include "achieve.cpp"
+#include "rubydb_writer.hpp"
 s64 g_fake_now = 1000;
 int g_save_opens = 0;
 Result g_save_rc = 0;
@@ -105,6 +106,7 @@ int main() {
           "]}",
           d);
     fclose(d);
+    rubydb::from_json_file("sdmc:/switch/ruby_achievements/achievements/0100000000ABC000.json");
 
     sqlite3* db;
     sqlite3_open(":memory:", &db);
@@ -220,6 +222,10 @@ int main() {
         "]}";
     fputs(defs.c_str(), d);
     fclose(d);
+    // Ícone do b_glider dentro do pacote (BLOB).
+    rubydb::write("sdmc:/switch/ruby_achievements/achievements/0100000000BBB000.rubydb", defs,
+                  {{"b_glider", std::string("\x89PNG\r\n\x1a\n", 8) + "b_glider"}});
+    remove("sdmc:/switch/ruby_achievements/achievements/0100000000BBB000.json");
     exec(db, "INSERT INTO games(id,title_id,display_name,source_type,created_at,updated_at) "
              "VALUES(2,'0100000000BBB000','BOTW-like','NATIVE',0,0);");
     g_fake_proc = {90, 0x0100000000BBB000ULL, kMain, kMainSize};
@@ -256,13 +262,9 @@ int main() {
     // [main+0x1E3B188] -> Manager; [+0xC00] mFlagBuffer -> TriggerParam;
     // [+0x10] mBoolFlags.buffer / [+0x20] mS32Flags.buffer; [+0] primeiro objeto.
     {
-        FILE* in = fopen(PT_REPO "/tools/botw_ram_teste/01007EF00011E000.aventureiro.json", "rb");
-        FILE* out = fopen("sdmc:/switch/ruby_achievements/achievements/01007EF00011E000.json", "wb");
-        char buf[65536];
-        size_t n;
-        while ((n = fread(buf, 1, sizeof buf, in)) > 0) fwrite(buf, 1, n, out);
-        fclose(in);
-        fclose(out);
+        // O .rubydb gravado por tools/json_to_rubydb.py (Python -> C++ no mesmo formato).
+        rubydb::copy(PT_REPO "/tools/botw_ram_teste/01007EF00011E000.aventureiro.rubydb",
+                     "sdmc:/switch/ruby_achievements/achievements/01007EF00011E000.rubydb");
     }
     const u64 bMain = 0x80000000, bMainSize = 0x1E98000, bHeap = 0x90000000;
     g_fake_regions.push_back({bMain, std::vector<uint8_t>(bMainSize, 0)});
@@ -334,7 +336,7 @@ int main() {
     check("pacote de RAM: só conquistas de RAM (e a Ruby)", pt_db_scalar(db, "SELECT COUNT(*) FROM achievements WHERE id LIKE 'L:01007EF00011E000:%' AND id NOT LIKE '%:rt_%' AND rarity <> 'ruby'", 0, 0, 0) == 0);
     check("icone: caminho no SD gravado na galeria",
           pt_db_scalar(db, "SELECT COUNT(*) FROM achievements WHERE id='L:0100000000BBB000:b_glider' AND "
-                           "icon_local_path='sdmc:/switch/ruby_achievements/achievements/icons/0100000000BBB000/b_glider.png'", 0, 0, 0) == 1);
+                           "icon_local_path='rubydb:0100000000BBB000.rubydb#b_glider'", 0, 0, 0) == 1);
     // Trava de versão: o pacote tem build_id; outro executável não lê a RAM.
     for (int i = 1; i <= 5; i++) *fake_at(bobj + 0x18 * (u64)i + 0x0B) = 0x03;  // 5 torres
     g_fake_proc.pid = 92;
@@ -404,6 +406,7 @@ int main() {
         FILE* g = fopen("sdmc:/switch/ruby_achievements/achievements/0100000000CCC000.json", "wb");
         fputs(defs.c_str(), g);
         fclose(g);
+        rubydb::from_json_file("sdmc:/switch/ruby_achievements/achievements/0100000000CCC000.json");
         exec(db, "INSERT INTO games(id,title_id,display_name,source_type,created_at,updated_at) "
                  "VALUES(4,'0100000000CCC000','Generico','NATIVE',0,0);");
         g_fake_proc = {95, 0x0100000000CCC000ULL, kMain, kMainSize, {}};

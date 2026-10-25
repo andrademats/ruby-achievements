@@ -65,11 +65,11 @@ int main() {
     // --- leitura da fila
     char buf[] = "3|gold|sdmc:/i.png|Ouro\n4|ruby||Platina\n2|bronze||Velha\n5|Antigo|descricao\nlixo\n";
     auto q = popup::parse_queue(buf, 2);
-    check("fila: só ids > visto, na ordem do arquivo", q.size() == 3 && q[0].id == 3 && q[1].id == 4 && q[2].id == 5);
+    check("fila: só ids > visto, na ordem do arquivo; linhas fora do formato ignoradas",
+          q.size() == 2 && q[0].id == 3 && q[1].id == 4);
     check("fila: raridade, ícone e título",
           q[0].rarity == popup::Rarity::Gold && q[0].icon == "sdmc:/i.png" && q[0].title == "Ouro" &&
-              q[1].rarity == popup::Rarity::Ruby);
-    check("fila: formato antigo (id|título|descrição)", q[2].title == "Antigo" && q[2].icon.empty());
+              q[1].rarity == popup::Rarity::Ruby && q[1].icon.empty() && q[1].title == "Platina");
 
     // --- desligada (padrão): mostra todas, uma por uma
     Sim off;

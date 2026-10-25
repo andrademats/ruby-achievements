@@ -16,6 +16,10 @@ bool g_home_front = false;
 u64 detect_running_title(void) { return g_tid; }
 bool detect_is_forwarder(u64 tid) { return (tid >> 56) == 0x05; }
 bool detect_is_ghost(u64) { return false; }
+bool detect_build_id(char out[65]) {
+    out[0] = 0;
+    return false;
+}
 bool detect_home_in_front(u64) { return g_home_front; }
 u64 detect_focused_title(void) { return 0; }
 void detect_init(void) {}

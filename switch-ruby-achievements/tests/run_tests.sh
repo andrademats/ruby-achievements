@@ -3,8 +3,8 @@
 # (shim/). Rodar com `make test` na pasta switch-ruby-achievements, no bash do MSYS2 do devkitPro
 # (usa o g++ do MSYS2). Saída: um bloco por teste e o resumo no fim; código 1 se algo falhar.
 #
-# Variáveis: PYTHON (caminho do Python 3, para o i18n_check), ONLY (nomes dos testes a rodar,
-# separados por espaço; vazio = todos).
+# Variáveis: PYTHON (caminho do Python 3, para o i18n_check e o rubydb_tool_test), ONLY (nomes
+# dos testes a rodar, separados por espaço; vazio = todos).
 set -u
 
 T="$(cd "$(dirname "$0")" && pwd)"
@@ -30,6 +30,16 @@ PASS=0
 FAILS=()
 
 selected() { [ -z "${ONLY:-}" ] || [[ " $ONLY " == *" $1 "* ]]; }
+
+# Python 3 em $PY (vazio = não achado). O bash do MSYS2 não herda o PATH nem o LOCALAPPDATA
+# do Windows: procura também nos locais padrão do instalador.
+find_python() {
+    PY=${PYTHON:-}
+    [ -n "$PY" ] && return
+    for c in python3 python /c/Users/*/AppData/Local/Python/pythoncore-3*/python.exe              /c/Users/*/AppData/Local/Programs/Python/Python3*/python.exe; do
+        if command -v "$c" > /dev/null 2>&1; then PY=$c; return; fi
+    done
+}
 
 # build <nome> <args do g++...>: compila <nome>.exe; erro de compilação conta como falha.
 build() {
@@ -91,6 +101,20 @@ for t in it2 it_fix pack_app_test; do
     run $t "run_$t/$SD" sh -c "cd ../../.. && ../$t.exe"
 done
 
+# Pacotes .rubydb: leitura (common/ach/pt_pack.cpp) e a ferramenta de conversão (Python)
+if selected rubydb_test && build rubydb_test "${BASE[@]}" "$T/rubydb_test.cpp" "${PACK[@]}" "${DB[@]}"; then
+    run rubydb_test run_rubydb_test "../rubydb_test.exe"
+fi
+if selected rubydb_tool_test; then
+    find_python
+    if [ -z "$PY" ]; then
+        echo "== rubydb_tool_test: Python 3 não encontrado (rode com PYTHON=/caminho/python.exe)"
+        FAILS+=("rubydb_tool_test (sem Python)")
+    else
+        run rubydb_tool_test run_rubydb_tool env PYTHONIOENCODING=utf-8 "$PY" -I "$T/rubydb_tool_test.py" "$R"
+    fi
+fi
+
 # status.txt e config.ini
 for t in st_test cfg_test; do
     selected $t || continue
@@ -131,7 +155,7 @@ if selected update_test; then
        gcc -O1 -c "$M/monocypher-ed25519.c" -I"$M" -o monocypher-ed25519.o >> update_test.build.log 2>&1 &&
        build update_test "${BASE[@]}" -I"$A" -I"$M" -I"$R/app_nro/lib/borealis/library/include/borealis/extern" \
            "-DPT_VERSION=\"$(tr -d ' \r\n' < "$R/VERSION")\"" -include "$T/shim/sha256_shim.h" \
-           "$T/update_test.cpp" "$A/update.cpp" "$T/http_fake.cpp" "$A/i18n.cpp" "$A/prefs.cpp" \
+           "$T/update_test.cpp" "$A/update.cpp" "$A/sha256.cpp" "$T/http_fake.cpp" "$A/i18n.cpp" "$A/prefs.cpp" \
            "$R/common/core/pt_config.cpp" "${CORE[@]}" monocypher.o monocypher-ed25519.o; then
         run update_test run_update_test "../update_test.exe"
     elif [ ! -f update_test.exe ]; then
@@ -140,16 +164,17 @@ if selected update_test; then
     fi
 fi
 
+# Pacotes da comunidade (community.cpp): index.json, filtro, cópia sem rede e instalação (HTTP falso)
+if selected community_test &&
+   build community_test "${BASE[@]}" -I"$A" -I"$R/app_nro/lib/borealis/library/include/borealis/extern" \
+       -include "$T/shim/sha256_shim.h" "$T/community_test.cpp" "$A/community.cpp" "$A/sha256.cpp" \
+       "$T/http_fake.cpp" "$A/i18n.cpp" "$A/prefs.cpp" "$R/common/core/pt_config.cpp" "${PACK[@]}" "${DB[@]}"; then
+    run community_test "run_community_test/$SD" sh -c "cd ../../.. && ../community_test.exe"
+fi
+
 # Tabela de tradução contra o código
 if selected i18n_check; then
-    PY=${PYTHON:-}
-    if [ -z "$PY" ]; then
-        # O bash do MSYS2 não herda o PATH nem o LOCALAPPDATA do Windows: locais padrão do instalador.
-        for c in python3 python /c/Users/*/AppData/Local/Python/pythoncore-3*/python.exe \
-                 /c/Users/*/AppData/Local/Programs/Python/Python3*/python.exe; do
-            if command -v "$c" > /dev/null 2>&1; then PY=$c; break; fi
-        done
-    fi
+    find_python
     if [ -z "$PY" ]; then
         echo "== i18n_check: Python 3 não encontrado (rode com PYTHON=/caminho/python.exe)"
         FAILS+=("i18n_check (sem Python)")

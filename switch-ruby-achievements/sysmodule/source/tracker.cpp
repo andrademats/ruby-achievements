@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <chrono>
+
 namespace {
 
 // Uma sessão em memória. game_id/user_id/session_id ficam 0 até a gravação.
@@ -30,6 +32,8 @@ struct Sess {
     int64_t game_id, user_id, session_id;
     int64_t start, end, counted;  // end = 0 => sessão viva
     bool untracked;       // tracking do jogo desativado: nada desta sessão é gravado
+    char build_id[65];    // jogo do sistema: build id do executável (lido ao fim da abertura)
+    bool build_saved;     // build_id já está em title_builds
 };
 
 constexpr int kMaxClosed = 8;
@@ -133,6 +137,9 @@ void settle_live(void) {
     // Jogo do sistema: nenhuma varredura das pastas de saves de frontends
     // enquanto ele estiver aberto (disputa o SD com os carregamentos).
     if (!native_game(g_live)) roms_baseline_scan();
+    // Build id para os pacotes da comunidade (o app compara com supported_build_ids).
+    if (native_game(g_live) && detect_build_id(g_live.build_id))
+        pt_log("sessao: %016lX build %.16s", g_live.tid, g_live.build_id);
     g_last_scan = 0;
     g_need_flush = true;
     pt_log("sessao: %016lX liberado para gravacao (conta %s)", g_live.tid, g_live.has_uid ? "detectada" : "nao detectada");
@@ -305,6 +312,8 @@ void flush(int64_t now) {
     g_closed_n = kept;
     bool live_ok = g_live_active && flush_one(db, g_live, now, &users_changed);
     if (g_live_active && !live_ok) all_ok = false;
+    if (live_ok && g_live.build_id[0] && !g_live.build_saved)
+        g_live.build_saved = store_title_build(db, g_live.tid, g_live.build_id, now) == 0;
 
     if (in_tx && sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
         pt_log("banco: COMMIT falhou (%s); sessoes regravadas na proxima vez", sqlite3_errmsg(db));
@@ -328,6 +337,8 @@ void flush(int64_t now) {
     // Sempre: apaga da fila o que o overlay já mostrou. Sem mudanças, o COMMIT
     // não grava nada no cartão.
     {
+        auto t0 = std::chrono::steady_clock::now();
+        pt_log_batch_begin();  // as linhas da avaliação vão para o SD numa escrita só
         bool atx = sqlite3_exec(db, "BEGIN IMMEDIATE", NULL, NULL, NULL) == SQLITE_OK;
         for (int i = 0; i < done_n; i++)
             achieve_check(db, {done[i].game_id, done[i].user_id, done[i].tid, sess_rom(done[i]), false}, now);
@@ -342,6 +353,10 @@ void flush(int64_t now) {
             if (atx) sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             achieve_discard();
         }
+        pt_log_batch_end();
+        long long ms =
+            (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+        if (ms >= 500) pt_log("conquistas: avaliacao e fila do pop-up levaram %lld ms", ms);
     }
     achieve_export_current(db, g_live_active ? g_live.game_id : 0, g_live_active ? g_live.user_id : 0);
 

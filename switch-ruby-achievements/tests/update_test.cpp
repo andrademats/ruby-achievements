@@ -8,6 +8,7 @@
 #include "pt_paths.h"
 #include "pt_update.h"
 #include "pt_util.h"
+#include "sha256.hpp"
 #include "update.hpp"
 
 #include <map>
@@ -129,11 +130,11 @@ int main() {
     // --- SHA-256 (shim do PC com a API do libnx) ---
     put("sdmc:/vazio.bin", "");
     put("sdmc:/abc.bin", "abc");
-    check("sha256(\"\")", upd::sha256_file("sdmc:/vazio.bin") ==
+    check("sha256(\"\")", sha256_file("sdmc:/vazio.bin") ==
                               "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    check("sha256(\"abc\")", upd::sha256_file("sdmc:/abc.bin") ==
+    check("sha256(\"abc\")", sha256_file("sdmc:/abc.bin") ==
                                  "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    check("sha256 de arquivo ausente = \"\"", upd::sha256_file("sdmc:/nao_existe.bin").empty());
+    check("sha256 de arquivo ausente = \"\"", sha256_file("sdmc:/nao_existe.bin").empty());
 
     // --- Versões ---
     upd::Version v;

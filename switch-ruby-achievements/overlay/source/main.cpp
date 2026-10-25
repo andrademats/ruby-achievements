@@ -191,7 +191,7 @@ size_t drop_flood(const std::vector<Popup>& queue, bool enabled, const char* why
 }
 
 // Som do pop-up: o escolhido no app (config.ini popup_sfx) se seguir as regras de
-// pt_wav.hpp; senão o padrão.
+// pt_wav.hpp; senão o padrão. Os pacotes não têm som.
 std::string popup_sfx() {
     if (!g_cfg.popup_sfx[0]) return PT_POPUP_SFX_PATH;
     std::string path = pt::sfx_path(g_cfg.popup_sfx);
@@ -294,12 +294,13 @@ public:
         pt_config_load(&g_cfg);  // idioma, som e proteção contra flood podem ter mudado
         if (drop_flood(queue, g_cfg.popup_flood, "fila longa")) return;
         m_popup = queue.front();
+        // O ícone vem antes de marcar: o sysmodule apaga do cache o que saiu da fila.
+        m_has_icon = load_popup_icon(m_popup.icon.c_str(), m_icon);
         // Marca já ao começar: abrir o menu no meio do pop-up destrói esta tela,
         // e marcando só no fim ele aparecia de novo depois (log de 2026-10-20).
         mark_popup_seen(m_popup.id);
         g_flood.shown();
         m_subtitle = g_cfg.app_language == 1 ? "Conquista desbloqueada" : "Achievement unlocked";
-        m_has_icon = load_popup_icon(m_popup.icon.c_str(), m_icon);
         m_fitted = false;
         std::string sfx = popup_sfx();
         m_total = popup::total_ms(sound::duration_ms(sfx.c_str()));
@@ -500,7 +501,7 @@ public:
         if (data.game.empty()) {
             list->addItem(new tsl::elm::CategoryHeader("Abra um jogo para ver as conquistas dele"));
         } else if (data.rows.empty()) {
-            list->addItem(new tsl::elm::CategoryHeader("Crie " PT_ACH_DIR "/<Title ID>.json"));
+            list->addItem(new tsl::elm::CategoryHeader("Crie " PT_ACH_DIR "/<Title ID>.rubydb"));
             list->addItem(new tsl::elm::CategoryHeader("ou sincronize o RetroAchievements no app"));
         } else {
             for (auto& r : data.rows) list->addItem(new AchItem(r), 84);

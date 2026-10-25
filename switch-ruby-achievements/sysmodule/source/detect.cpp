@@ -17,6 +17,22 @@ u64 detect_running_title(void) {
     return tid;
 }
 
+bool detect_build_id(char out[65]) {
+    out[0] = '\0';
+    u64 pid = 0;
+    if (R_FAILED(pmdmntGetApplicationProcessId(&pid))) return false;
+    if (R_FAILED(ldrDmntInitialize())) return false;
+    // Como o dmnt (cheats): pede só 2 módulos; com 2, o principal é o segundo (o primeiro é o rtld).
+    LoaderModuleInfo mods[2];
+    s32 n = 0;
+    Result rc = ldrDmntGetProcessModuleInfo(pid, mods, 2, &n);
+    ldrDmntExit();
+    if (R_FAILED(rc) || n < 1 || n > 2) return false;
+    const LoaderModuleInfo& m = mods[n == 2 ? 1 : 0];
+    for (int i = 0; i < 0x20; i++) snprintf(out + 2 * i, 3, "%02X", m.build_id[i]);
+    return true;
+}
+
 bool detect_home_in_front(u64 app_tid) {
     if (app_tid == 0) return true;
     // Sessão curta: o app (importação do NX Activity Log) também usa o pdm:qry.

@@ -8,6 +8,7 @@
 #include "ram.h"
 
 #include <ctype.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -17,6 +18,7 @@
 #include <strings.h>
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -264,7 +266,9 @@ struct EvalCtx {
     };
     std::vector<RamWindow> windows;
     std::string cur_id;  // conquista em avaliação (log da RAM)
-    std::string build_id;  // "build_id" do pacote: as condições de RAM só valem nesse executável
+    // supported_build_ids do pacote (prefixos hex): as condições de RAM só valem nesses
+    // executáveis. Vazio = qualquer; {"-"} = lista inválida, nenhum.
+    std::vector<std::string> build_ids;
 };
 
 std::string state_key(const AchieveTarget& t, const std::string& file) {
@@ -780,10 +784,16 @@ bool ram_process(EvalCtx& c) {
                c.proc.main_base, (unsigned long)(c.proc.main_size / 1024), c.proc.build_id);
     }
     // Trava de versão: offsets de RAM só valem no executável para o qual foram achados.
-    if (!c.build_id.empty() && strncasecmp(c.proc.build_id, c.build_id.c_str(), c.build_id.size()) != 0) {
+    bool build_ok = c.build_ids.empty();
+    std::string wanted;
+    for (const std::string& b : c.build_ids) {
+        build_ok = build_ok || strncasecmp(c.proc.build_id, b.c_str(), b.size()) == 0;
+        wanted += (wanted.empty() ? "" : ",") + b;
+    }
+    if (!build_ok) {
         if (g_ram.build_warned_pid != c.proc.pid)
             pt_log("ram: build id do jogo %.32s difere do pacote (%s); conquistas de RAM bloqueadas nesta versao",
-                   c.proc.build_id, c.build_id.c_str());
+                   c.proc.build_id, wanted.c_str());
         g_ram.build_warned_pid = c.proc.pid;
         c.ram_ok = false;
         return false;
@@ -1237,9 +1247,23 @@ void achieve_check(sqlite3* db, const AchieveTarget& t, int64_t now) {
     bool changed = defs_changed(t, file);
     EvalCtx c{db, t, changed || !pt_pack_has_meta(db, key), {}, {}};
     if (c.force) pt_pack_sync_meta(db, key, t.game_id, root);
-    c.build_id = root.get_str("build_id");
-    if (c.build_id.size() > 64 || c.build_id.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos)
-        c.build_id = "-";  // inválido: nunca bate, as condições de RAM ficam bloqueadas
+    // "build_id": lista separada por vírgulas (supported_build_ids do pacote).
+    std::string builds = root.get_str("build_id");
+    for (size_t at = 0; at <= builds.size();) {
+        size_t comma = builds.find(',', at);
+        if (comma == std::string::npos) comma = builds.size();
+        std::string b = builds.substr(at, comma - at);
+        b.erase(0, b.find_first_not_of(" 	"));
+        b.erase(b.find_last_not_of(" 	") + 1);
+        if (!b.empty()) {
+            if (b.size() > 64 || b.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+                c.build_ids.assign(1, "-");  // inválido: nunca bate, as condições de RAM ficam bloqueadas
+                break;
+            }
+            c.build_ids.push_back(b);
+        }
+        at = comma + 1;
+    }
     // 1ª passada: metadados e conquistas ainda bloqueadas (hashes em lote). A Ruby
     // (platina) não tem condição: fica de fora e é decidida no fim.
     std::vector<std::pair<const JVal*, std::string>> pending;
@@ -1384,7 +1408,8 @@ void achieve_export_popups(sqlite3* db) {
     int64_t seen = pt_read_file(PT_POPUP_SEEN_PATH, seen_buf, sizeof(seen_buf)) > 0 ? strtoll(seen_buf, NULL, 10) : 0;
     if (seen > 0) pt_db_scalar(db, "DELETE FROM achievement_queue WHERE id <= ?", seen, 0, 0);
 
-    // "id|raridade|ícone|título" (a descrição não aparece no pop-up).
+    // "id|raridade|ícone|título" (a descrição não aparece no pop-up). O overlay não tem
+    // SQLite: o ícone que está dentro de um .rubydb vai para PT_POPUP_CACHE_DIR.
     sqlite3_stmt* st = NULL;
     if (sqlite3_prepare_v2(db,
                            "SELECT q.id, COALESCE(a.rarity,'bronze'), COALESCE(a.icon_local_path,''), a.title "
@@ -1393,18 +1418,57 @@ void achieve_export_popups(sqlite3* db) {
                            -1, &st, NULL) != SQLITE_OK)
         return;
     sqlite3_bind_int(st, 1, PT_POPUP_QUEUE_MAX);
+    // Ícone já resolvido de cada item da fila (extraído uma vez só).
+    struct Icon {
+        std::string path, file;  // file = nome dentro de PT_POPUP_CACHE_DIR ("" = não é do cache)
+    };
+    static std::map<long long, Icon> resolved;
+    std::map<long long, Icon> now;
     std::string text;
     while (sqlite3_step(st) == SQLITE_ROW) {
+        long long qid = (long long)sqlite3_column_int64(st, 0);
+        auto it = resolved.find(qid);
+        Icon m;
+        if (it != resolved.end()) {
+            m = it->second;
+        } else {
+            std::string icon = field(sqlite3_column_text(st, 2), 300), pack, aid;
+            m.path = icon;
+            if (pt_pack_parse_icon_ref(icon, pack, aid)) {
+                char name[40];
+                snprintf(name, sizeof(name), "q%lld.png", qid);
+                std::string path = std::string(PT_POPUP_CACHE_DIR "/") + name;
+                bool ok = pt_pack_extract_icon(pack, aid, path);
+                m.path = ok ? path : "";
+                m.file = ok ? name : "";
+            }
+        }
+        now[qid] = m;
         char head[32];
-        snprintf(head, sizeof(head), "%lld|", (long long)sqlite3_column_int64(st, 0));
+        snprintf(head, sizeof(head), "%lld|", qid);
         text += head;
         text += field(sqlite3_column_text(st, 1), 8) + "|";
-        text += field(sqlite3_column_text(st, 2), 300) + "|";
+        text += m.path + "|";
         text += field(sqlite3_column_text(st, 3), 120) + "\n";
     }
     sqlite3_finalize(st);
+    resolved.swap(now);
+    std::vector<std::string> keep;  // arquivos de PT_POPUP_CACHE_DIR ainda usados pela fila
+    for (auto& r : resolved)
+        if (!r.second.file.empty()) keep.push_back(r.second.file);
 
     static std::string last;
     static bool written = false;
+    bool changed = !written || text != last;
     write_if_changed(PT_POPUP_PATH, text, last, written);
+    if (!changed) return;
+    // O que saiu da fila sai do cache (um arquivo ainda aberto pelo overlay fica para a próxima).
+    if (DIR* d = opendir(PT_POPUP_CACHE_DIR)) {
+        std::vector<std::string> gone;
+        while (struct dirent* e = readdir(d))
+            if (e->d_name[0] != '.' && std::find(keep.begin(), keep.end(), e->d_name) == keep.end())
+                gone.push_back(e->d_name);
+        closedir(d);
+        for (auto& g : gone) unlink((std::string(PT_POPUP_CACHE_DIR "/") + g).c_str());
+    }
 }

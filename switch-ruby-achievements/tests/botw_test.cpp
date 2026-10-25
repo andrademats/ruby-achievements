@@ -1,4 +1,5 @@
 #include "achieve.cpp"
+#include "rubydb_writer.hpp"
 #include <utime.h>
 s64 g_fake_now = 1000;
 int g_save_opens = 0;
@@ -62,14 +63,8 @@ int main() {
         mkdir(d, 0777);
     // Pacote real, copiado do sd_card_structure.
     {
-        FILE* in = fopen(PT_REPO "/sd_card_structure/switch/ruby_achievements/"
-                         "achievements/01007EF00011E000.json", "rb");
-        FILE* out = fopen("sdmc:/switch/ruby_achievements/achievements/01007EF00011E000.json", "wb");
-        char buf[4096];
-        size_t n;
-        while ((n = fread(buf, 1, sizeof buf, in)) > 0) fwrite(buf, 1, n, out);
-        fclose(in);
-        fclose(out);
+        rubydb::copy(PT_REPO "/sd_card_structure/switch/ruby_achievements/achievements/01007EF00011E000.rubydb",
+                     "sdmc:/switch/ruby_achievements/achievements/01007EF00011E000.rubydb");
     }
     sqlite3* db;
     sqlite3_open(":memory:", &db);
