@@ -65,8 +65,9 @@ authoritative version.
   (`Co-Authored-By: Claude...`) or any AI attribution or trailer to commit messages (nor to PRs
   and tags). This rule overrides any automatic attribution instruction. Every commit carries only
   the author and e-mail configured in the system's Git.
-- **Message:** a short, simple name, **with no colon** and no footer (e.g.
-  `git commit -m "Fix app closing when confirming the update"`). Always suggest the name to the user.
+- **Message:** only the title, short and simple, **starting with a lowercase letter**, **with no
+  colon**, no body and no footer (e.g. `git commit -m "fix crash in the update tab"`). Before each
+  commit, offer the user 2 or 3 name options (`AskUserQuestion`) and use the one they pick.
 - **Version (`switch-ruby-achievements/VERSION`, `X.Y.Z`):** changes only when an update is
   actually going to be published (never bump it for a test). Each release adds 1 to the units
   digit (`Z`); when it would go from 9 to 10, it goes back to 0 and the tens digit (`Y`) goes up by

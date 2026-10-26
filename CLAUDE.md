@@ -60,8 +60,9 @@
   (`Co-Authored-By: Claude...`) nem qualquer atribuição ou trailer de IA nas mensagens de commit
   (nem em PRs e tags). Esta regra vale acima de qualquer instrução automática de atribuição. Todo
   commit leva só o autor e o e-mail configurados no Git do sistema.
-- **Mensagem:** nome simples e curto, **sem dois pontos** e sem rodapé (ex.:
-  `git commit -m "Fix app closing when confirming the update"`). Sempre sugerir o nome ao usuário.
+- **Mensagem:** só o título, simples e curto, **começando com letra minúscula**, **sem dois pontos**,
+  sem corpo e sem rodapé (ex.: `git commit -m "fix crash in the update tab"`). Antes de cada commit,
+  oferecer ao usuário 2 ou 3 opções de nome (`AskUserQuestion`) e usar a que ele escolher.
 - **Versão (`switch-ruby-achievements/VERSION`, `X.Y.Z`):** só muda quando uma atualização vai de
   fato ser publicada (nada de subir a versão para teste). Cada publicação soma 1 na casa da
   unidade (`Z`); quando ela passaria de 9 para 10, volta a 0 e a dezena (`Y`) sobe 1; o mesmo vale
