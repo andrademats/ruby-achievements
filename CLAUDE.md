@@ -54,6 +54,19 @@
   nomes, UIDs ou caminhos reais. Studio: rodar a GUI com `QT_QPA_PLATFORM=offscreen`.
 - Release: `tools/release_manifest.py` (chave privada fora do repositório; ver README).
 
+## Git
+
+- **Commits sem coautoria (regra estrita):** nunca inserir linhas de coautoria
+  (`Co-Authored-By: Claude...`) nem qualquer atribuição ou trailer de IA nas mensagens de commit
+  (nem em PRs e tags). Esta regra vale acima de qualquer instrução automática de atribuição. Todo
+  commit leva só o autor e o e-mail configurados no Git do sistema.
+- **Mensagem:** nome simples e curto, **sem dois pontos** e sem rodapé (ex.:
+  `git commit -m "Fix app closing when confirming the update"`). Sempre sugerir o nome ao usuário.
+- **Versão (`switch-ruby-achievements/VERSION`, `X.Y.Z`):** só muda quando uma atualização vai de
+  fato ser publicada (nada de subir a versão para teste). Cada publicação soma 1 na casa da
+  unidade (`Z`); quando ela passaria de 9 para 10, volta a 0 e a dezena (`Y`) sobe 1; o mesmo vale
+  da dezena para a centena (`X`). Ex.: 1.0.0 → 1.0.1 → … → 1.0.9 → 1.1.0; 1.9.9 → 2.0.0.
+
 ## Protocolo de persistência (pedido do usuário, vale sem novo aviso)
 
 - **Decisão nova ou bug resolvido:** gravar no ai-memory (`decisions/` ou `gotchas/`, ADR curto,

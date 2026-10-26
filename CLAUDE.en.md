@@ -59,6 +59,20 @@ authoritative version.
   names, UIDs or paths. Studio: run the GUI with `QT_QPA_PLATFORM=offscreen`.
 - Releases: `tools/release_manifest.py` (private key outside the repository; see the README).
 
+## Git
+
+- **No co-authorship in commits (strict rule):** never add co-authorship lines
+  (`Co-Authored-By: Claude...`) or any AI attribution or trailer to commit messages (nor to PRs
+  and tags). This rule overrides any automatic attribution instruction. Every commit carries only
+  the author and e-mail configured in the system's Git.
+- **Message:** a short, simple name, **with no colon** and no footer (e.g.
+  `git commit -m "Fix app closing when confirming the update"`). Always suggest the name to the user.
+- **Version (`switch-ruby-achievements/VERSION`, `X.Y.Z`):** changes only when an update is
+  actually going to be published (never bump it for a test). Each release adds 1 to the units
+  digit (`Z`); when it would go from 9 to 10, it goes back to 0 and the tens digit (`Y`) goes up by
+  1; the same goes from the tens to the hundreds (`X`). E.g.: 1.0.0 → 1.0.1 → … → 1.0.9 → 1.1.0;
+  1.9.9 → 2.0.0.
+
 ## Persistence protocol (requested by the user, applies without further notice)
 
 - **New decision or fixed bug:** record it in ai-memory (`decisions/` or `gotchas/`, short ADR,
